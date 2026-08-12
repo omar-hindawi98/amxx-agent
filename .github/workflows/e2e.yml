@@ -49,7 +49,7 @@ jobs:
             -i plugins/amxmodx_genai/include -i plugins/include -i tests/plugins/include \
             -o build/test_e2e.amxx
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: amxx-plugins
           path: build/
