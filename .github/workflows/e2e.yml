@@ -16,7 +16,7 @@ jobs:
     if: github.event_name != 'workflow_call'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache AMXMODX compiler
         id: cache-amxmodx
@@ -59,7 +59,7 @@ jobs:
     needs: compile
     if: always() && (needs.compile.result == 'success' || needs.compile.result == 'skipped')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v4
         with:
