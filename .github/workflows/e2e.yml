@@ -91,7 +91,7 @@ jobs:
                   target: /root/.ollama
           EOF
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build sidecar image
         uses: docker/build-push-action@v7
