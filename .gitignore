@@ -1,0 +1,28 @@
+# AMXMODX compiled output
+*.amxx
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+.python-version
+dist/
+*.egg-info/
+
+# uv
+uv.lock
+
+# Environment
+.env
+.env.*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

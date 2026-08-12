@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "amxmodx_genai"
+version = "2.0.0"
+description = "LLM agent bridge for AMXMODX game servers"
+requires-python = ">=3.11"
+authors = [{ name = "omar-hindawi98" }]
+dependencies = [
+    "strands-agents[anthropic]>=0.1.0",
+]
+
+[project.optional-dependencies]
+ollama = [
+    "strands-agents[ollama]>=0.1.0",
+]
+
+[project.scripts]
+genai-sidecar = "amxmodx_genai.server:serve_cli"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-m 'not live'"
+markers = ["live: requires a running sidecar (deselected by default)"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/amxmodx_genai"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"

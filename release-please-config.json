@@ -1,0 +1,18 @@
+{
+  "release-type": "python",
+  "packages": {
+    ".": {
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "generic",
+          "path": "plugins/amxmodx_genai/core.sma"
+        }
+      ]
+    }
+  }
+}

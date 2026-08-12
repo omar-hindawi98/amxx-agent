@@ -1,0 +1,59 @@
+services:
+  cstrike:
+    image: cajuclc/cstrike-docker:latest
+    platform: linux/amd64
+    environment:
+      - PORT=27015
+      - MAP=de_dust2
+      - MAXPLAYERS=4
+      - SV_LAN=1
+      - CPU_MHZ=3000
+      - GENAI_HOST=sidecar
+      - GENAI_PORT=27016
+    ports:
+      - "27015:27015/udp"
+      - "27015:27015/tcp"
+    volumes:
+      # Pre-compiled plugins dropped in by CI before compose up.
+      - ./build/core.amxx:/home/steam/cstrike/cstrike/addons/amxmodx/plugins/core.amxx:ro
+      - ./build/test_json.amxx:/home/steam/cstrike/cstrike/addons/amxmodx/plugins/test_json.amxx:ro
+      - ./build/test_e2e.amxx:/home/steam/cstrike/cstrike/addons/amxmodx/plugins/test_e2e.amxx:ro
+      - ./docker/amxmodx/plugins.ini:/home/steam/cstrike/cstrike/addons/amxmodx/configs/plugins.ini:ro
+      - ./docker/amxmodx/modules.ini:/home/steam/cstrike/cstrike/addons/amxmodx/configs/modules.ini:ro
+      - ./docker/server.cfg:/home/steam/cstrike/cstrike/server.cfg:ro
+    depends_on:
+      - sidecar
+
+  sidecar:
+    build: .
+    image: amxmodx-genai-sidecar:latest
+    environment:
+      - GENAI_HOST=0.0.0.0
+      - GENAI_PORT=27016
+      - GENAI_BACKEND=${GENAI_BACKEND:-anthropic}
+      - GENAI_MODEL=${GENAI_MODEL:-}
+      - GENAI_OLLAMA_HOST=http://ollama:11434
+      - GENAI_OLLAMA_MODEL=${GENAI_OLLAMA_MODEL:-llama3.2}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    ports:
+      - "27016:27016"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      - OLLAMA_KEEP_ALIVE=5m
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  ollama_data:
