@@ -20,7 +20,7 @@ jobs:
 
       - name: Cache AMXMODX compiler
         id: cache-amxmodx
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /tmp/amxmodx
           key: amxmodx-1.8.2
@@ -67,7 +67,7 @@ jobs:
           path: build/
 
       - name: Cache Ollama model
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.ollama
           key: ollama-${{ env.GENAI_OLLAMA_MODEL }}
