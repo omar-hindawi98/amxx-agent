@@ -11,9 +11,7 @@ def validate() -> None:
     """Raise at startup if required credentials for the configured backend are missing."""
     backend = settings.model_backend
     if backend == "anthropic" and not settings.model_api_key:
-        raise RuntimeError(
-            "GENAI_MODEL_API_KEY is required when GENAI_MODEL_BACKEND=anthropic"
-        )
+        raise RuntimeError("GENAI_MODEL_API_KEY is required when GENAI_MODEL_BACKEND=anthropic")
 
 
 def make_model():
@@ -34,28 +32,37 @@ def make_model():
 
     if backend == "bedrock":
         from strands.models.bedrock import BedrockModel
+
         return BedrockModel(model_id=model_id, max_tokens=max_tokens)
 
     if backend == "ollama":
         from strands.models.ollama import OllamaModel
+
         return OllamaModel(host=endpoint or _OLLAMA_DEFAULT_ENDPOINT, model_id=model_id)
 
     if backend == "litellm":
         from strands.models.litellm import LiteLLMModel
+
         client_args: dict = {"api_key": api_key} if api_key else {}
         if endpoint:
             client_args["base_url"] = endpoint
-        return LiteLLMModel(model_id=model_id, params={"max_tokens": max_tokens}, client_args=client_args)
+        return LiteLLMModel(
+            model_id=model_id, params={"max_tokens": max_tokens}, client_args=client_args
+        )
 
     if backend == "openai":
         from strands.models.openai import OpenAIModel
+
         client_args = {"api_key": api_key} if api_key else {}
         if endpoint:
             client_args["base_url"] = endpoint
-        return OpenAIModel(model_id=model_id, params={"max_tokens": max_tokens}, client_args=client_args)
+        return OpenAIModel(
+            model_id=model_id, params={"max_tokens": max_tokens}, client_args=client_args
+        )
 
     if backend != "anthropic":
         import logging
+
         logging.getLogger(__name__).warning(
             "unknown backend %r, falling back to anthropic (supported: %s)",
             backend,
@@ -63,5 +70,6 @@ def make_model():
         )
 
     from strands.models.anthropic import AnthropicModel
+
     client_args = {"api_key": api_key} if api_key else {}
     return AnthropicModel(model_id=model_id, max_tokens=max_tokens, client_args=client_args)

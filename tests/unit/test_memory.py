@@ -13,6 +13,7 @@ def fresh_memory(tmp_path):
             del sys.modules[mod]
 
     import amxmodx_genai.core.memory as mem
+
     mem._engine = mem._make_engine(tmp_path / "test_memory.db")
 
     yield
@@ -37,7 +38,10 @@ def test_update_and_get():
     mem.update("1", "what should I buy?", "Buy AK47.")
     result = mem.get("1")
     assert len(result) == 2
-    assert result[0] == {"role": "user", "content": [{"type": "text", "text": "what should I buy?"}]}
+    assert result[0] == {
+        "role": "user",
+        "content": [{"type": "text", "text": "what should I buy?"}],
+    }
     assert result[1] == {"role": "assistant", "content": [{"type": "text", "text": "Buy AK47."}]}
 
 
@@ -138,6 +142,7 @@ def test_persists_across_reimport(tmp_path):
             del sys.modules[mod]
 
     import amxmodx_genai.core.memory as mem1
+
     mem1._engine = mem1._make_engine(db_path)
     mem1.update("42", "hello", "world")
 
@@ -147,6 +152,7 @@ def test_persists_across_reimport(tmp_path):
             del sys.modules[mod]
 
     import amxmodx_genai.core.memory as mem2
+
     mem2._engine = mem2._make_engine(db_path)
 
     result = mem2.get("42")
