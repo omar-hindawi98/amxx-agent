@@ -1,4 +1,4 @@
-"""Shared helpers for e2e tests (non-fixture utilities)."""
+"""Shared helpers for integration tests (non-fixture utilities)."""
 
 import asyncio
 import json

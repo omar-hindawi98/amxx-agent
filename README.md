@@ -7,11 +7,17 @@
 
 LLM agent bridge for AMXMODX game servers. Plugins call simple Pawn natives; a local Python TCP sidecar runs a Strands agent loop against the Anthropic API (or a local Ollama model) with two-tier persistent memory, plugin-registered tools and skills, and a composable system prompt.
 
-```
-CS 1.6 server
-  amxmodx
-    core.amxx  <----TCP (protocol v2)---->  amxmodx_genai sidecar  --HTTPS-->  Anthropic API
-    your_plugin.amxx
+```mermaid
+graph LR
+    subgraph CS 1.6 server
+        core["core.amxx"]
+        plugin["your_plugin.amxx"]
+    end
+    sidecar["amxmodx_genai sidecar"]
+    api["Anthropic API"]
+
+    core <-->|"TCP protocol v2"| sidecar
+    sidecar -->|HTTPS| api
 ```
 
 ## Requirements
@@ -34,7 +40,7 @@ ANTHROPIC_API_KEY=sk-ant-... uv run genai-sidecar
 Use Ollama instead of the Anthropic API:
 
 ```sh
-GENAI_BACKEND=ollama GENAI_OLLAMA_MODEL=llama3.2 uv run genai-sidecar
+GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=llama3.2 uv run genai-sidecar
 ```
 
 ### AMXMODX plugin
@@ -60,14 +66,12 @@ GENAI_BACKEND=ollama GENAI_OLLAMA_MODEL=llama3.2 uv run genai-sidecar
 |----------|---------|-------------|
 | `GENAI_HOST` | `127.0.0.1` | Bind address |
 | `GENAI_PORT` | `27016` | Bind port |
-| `GENAI_BACKEND` | `anthropic` | `anthropic` or `ollama` |
-| `GENAI_MODEL` | `claude-haiku-4-5-20251001` | Anthropic model ID |
-| `GENAI_TOKENS` | `512` | `max_tokens` per response |
-| `GENAI_OLLAMA_HOST` | `http://localhost:11434` | Ollama base URL |
-| `GENAI_OLLAMA_MODEL` | `llama3.2` | Ollama model name |
+| `GENAI_MODEL_BACKEND` | `anthropic` | `anthropic` or `ollama` |
+| `GENAI_MODEL_NAME` | `claude-haiku-4-5-20251001` | Model ID (Anthropic or Ollama) |
+| `GENAI_MODEL_TOKENS` | `512` | `max_tokens` per response |
+| `GENAI_MODEL_ENDPOINT` | `` | Model endpoint URL (e.g. Ollama base URL `http://localhost:11434`) |
 | `GENAI_MEMORY_PATH` | `~/.local/share/amxmodx_genai/memory.db` | SQLite memory file |
-| `GENAI_SKILLS_PATH` | `./skills` | Directory containing skill subdirectories |
-| `memory_max_messages` | `20` | Number of conversation turns to keep in short-term memory (counts turns, not individual messages) |
+| `GENAI_MEMORY_MAX_MESSAGES` | `20` | Conversation turns to keep in short-term memory (counts turns, not individual messages) |
 
 ## Plugin API
 
@@ -170,29 +174,9 @@ The sidecar maintains two tiers of memory per session:
 
 Session IDs default to the player's SteamID. For bots and LAN clients without a SteamID, they fall back to the client index. Override by passing a custom `session_id` to `genai_query` to share memory across players or create player-independent sessions.
 
-## Development
+## Contributing
 
-```sh
-uv sync --dev
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest                        # unit + e2e (mocked agent, no API key needed)
-uv run pytest -m live                # live tests (requires sidecar running)
-```
-
-### Docker
-
-Run the full AMX e2e suite (compiles plugins, starts game server + sidecar):
-
-```sh
-docker compose up
-```
-
-Run live loop tests against Ollama:
-
-```sh
-docker compose --profile live up --abort-on-container-exit live_test
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

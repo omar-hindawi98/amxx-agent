@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.e2e.conftest import get_handle, make_agent_result, tcp_exchange
+from tests.integration.helpers import get_handle, make_agent_result, tcp_exchange
 
 
 @pytest.mark.asyncio

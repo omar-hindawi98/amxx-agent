@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.e2e.helpers import make_agent_result
+from tests.integration.helpers import make_agent_result
 
 
 def _get_persistent():

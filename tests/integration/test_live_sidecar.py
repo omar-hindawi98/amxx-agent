@@ -1,9 +1,9 @@
 """
-E2e tests - require a real sidecar running.
+Integration tests against a real running sidecar.
 
 Run with:
 
-    GENAI_SIDECAR_HOST=127.0.0.1 pytest tests/e2e/
+    GENAI_SIDECAR_HOST=127.0.0.1 pytest tests/integration/
 
 Tests assert protocol correctness and non-empty responses only.
 They do NOT assert exact LLM output - that would be brittle.
@@ -17,6 +17,11 @@ import pytest
 
 SIDECAR_HOST = os.environ.get("GENAI_SIDECAR_HOST", "")
 SIDECAR_PORT = int(os.environ.get("GENAI_SIDECAR_PORT", "27016"))
+
+pytestmark = pytest.mark.skipif(
+    not SIDECAR_HOST,
+    reason="GENAI_SIDECAR_HOST not set - skipping live sidecar tests",
+)
 
 
 async def exchange(msg: dict, *, timeout: float = 60.0) -> list[dict]:
@@ -93,13 +98,13 @@ async def test_memory_persists_within_session():
     assert "AK" in response["text"] or "ak" in response["text"].lower(), (
         f"expected AK47 in follow-up response, got: {response['text']}"
     )
-    # cleanup - send clear_memory and close the connection from our side
+    # cleanup
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write(
         (json.dumps({"type": "clear_memory", "player": 1, "session_id": session}) + "\n").encode()
     )
     await writer.drain()
-    await asyncio.sleep(1.0)  # give sidecar time to process before we close
+    await asyncio.sleep(1.0)
     writer.close()
     await writer.wait_closed()
 
@@ -109,7 +114,6 @@ async def test_memory_clear_sends_no_response():
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write((json.dumps({"type": "clear_memory", "player": 99}) + "\n").encode())
     await writer.drain()
-    # The server sends nothing for clear_memory; verify no bytes arrive within 1s
     try:
         data = await asyncio.wait_for(reader.read(1), timeout=1.0)
         assert data == b"", f"expected no data, got {data!r}"
