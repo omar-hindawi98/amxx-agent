@@ -5,7 +5,12 @@ import sys
 
 import pytest
 
-from tests.integration.helpers import get_handle, make_agent_factory, make_agent_result, tcp_exchange
+from tests.integration.helpers import (
+    get_handle,
+    make_agent_factory,
+    make_agent_result,
+    tcp_exchange,
+)
 
 __all__ = ["get_handle", "make_agent_factory", "make_agent_result", "tcp_exchange"]
 

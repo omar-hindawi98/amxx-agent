@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.e2e.helpers import make_agent_result
+from tests.integration.helpers import make_agent_result
 
 
 def _get_handler():
@@ -129,7 +129,7 @@ def _make_frames_from_send(captured: list[dict]):
 @pytest.mark.asyncio
 async def test_empty_content_list_returns_no_response(unused_tcp_port):
     """Agent result with empty content list produces '(no response)'."""
-    from tests.e2e.conftest import get_handle, tcp_exchange
+    from tests.integration.helpers import get_handle, tcp_exchange
 
     result = MagicMock()
     msg = MagicMock()
@@ -157,7 +157,7 @@ async def test_empty_content_list_returns_no_response(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_whitespace_only_text_returns_no_response(unused_tcp_port):
     """Agent result with only whitespace text produces '(no response)'."""
-    from tests.e2e.conftest import get_handle, tcp_exchange
+    from tests.integration.helpers import get_handle, tcp_exchange
 
     block = MagicMock()
     block.text = "\n\n   \n"
@@ -187,7 +187,7 @@ async def test_whitespace_only_text_returns_no_response(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_none_message_returns_no_response(unused_tcp_port):
     """Agent result with message=None produces '(no response)'."""
-    from tests.e2e.conftest import get_handle, tcp_exchange
+    from tests.integration.helpers import get_handle, tcp_exchange
 
     result = MagicMock()
     result.message = None
@@ -213,7 +213,7 @@ async def test_none_message_returns_no_response(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_dict_content_block_text_extracted(unused_tcp_port):
     """Agent result with dict-style content blocks (not MagicMock) extracts text correctly."""
-    from tests.e2e.conftest import get_handle, tcp_exchange
+    from tests.integration.helpers import get_handle, tcp_exchange
 
     result = MagicMock()
     result.message = {"content": [{"type": "text", "text": "dict response"}]}
@@ -346,7 +346,7 @@ async def test_safe_send_error_suppresses_on_second_call():
 @pytest.mark.asyncio
 async def test_handler_exception_uses_safe_send_error(unused_tcp_port):
     """When the agent raises unexpectedly, _safe_send_error delivers the error frame."""
-    from tests.e2e.conftest import get_handle, tcp_exchange
+    from tests.integration.helpers import get_handle, tcp_exchange
 
     def make_agent(**kwargs):
         inst = MagicMock()
@@ -380,7 +380,7 @@ async def test_handler_exception_uses_safe_send_error(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_response_frame_arrives_before_done_frame(unused_tcp_port):
     """The response frame must always precede the done frame in the stream."""
-    from tests.e2e.conftest import get_handle, make_agent_result, tcp_exchange
+    from tests.integration.helpers import get_handle, make_agent_result, tcp_exchange
 
     def make_agent(**kwargs):
         inst = MagicMock()
@@ -407,7 +407,7 @@ async def test_response_frame_arrives_before_done_frame(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_error_response_frame_arrives_before_done_frame(unused_tcp_port):
     """Even the error response path sends response before done."""
-    from tests.e2e.conftest import get_handle, tcp_exchange
+    from tests.integration.helpers import get_handle, tcp_exchange
 
     def make_agent(**kwargs):
         inst = MagicMock()
