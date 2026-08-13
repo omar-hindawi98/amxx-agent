@@ -69,6 +69,8 @@ jobs:
         run: |
           SCRIPTING=/tmp/amxmodx/addons/amxmodx/scripting
           cp plugins/amxmodx_genai/include/*.inc "$SCRIPTING/include/"
+          mkdir -p "$SCRIPTING/include/tools"
+          cp plugins/amxmodx_genai/include/tools/*.inc "$SCRIPTING/include/tools/"
           cp plugins/include/*.inc "$SCRIPTING/include/"
           mkdir -p build
           OUT=$(amxxpc plugins/amxmodx_genai/core.sma -i"$SCRIPTING/include" 2>&1)
