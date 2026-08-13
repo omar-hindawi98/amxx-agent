@@ -16,6 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Cache Ollama model
+        uses: actions/cache@v6
+        with:
+          path: ~/.ollama
+          key: ollama-${{ env.GENAI_OLLAMA_MODEL }}
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Build sidecar image
