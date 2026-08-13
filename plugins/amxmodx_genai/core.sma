@@ -14,6 +14,7 @@
 new g_pCvarHost;
 new g_pCvarPort;
 new g_pCvarCoreTools;
+new g_pCvarCoreSkills;
 
 // ---- plugin lifecycle -------------------------------------------------------
 
@@ -24,6 +25,7 @@ public plugin_init()
     g_pCvarHost       = register_cvar("genai_host",        "127.0.0.1");
     g_pCvarPort       = register_cvar("genai_port",        "27016");
     g_pCvarCoreTools  = register_cvar("genai_core_tools",  "1");
+    g_pCvarCoreSkills = register_cvar("genai_core_skills", "1");
 
     g_tSystemPrompts = TrieCreate();
 
@@ -41,6 +43,9 @@ public plugin_init()
 
     if (get_pcvar_num(g_pCvarCoreTools))
         register_core_tools();
+
+    if (get_pcvar_num(g_pCvarCoreSkills))
+        genai_register_skill("amxmodx-reference");
 }
 
 public plugin_end()
