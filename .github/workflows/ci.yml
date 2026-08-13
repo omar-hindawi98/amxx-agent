@@ -67,9 +67,13 @@ jobs:
 
       - name: Compile plugins
         run: |
+          SCRIPTING=/tmp/amxmodx/addons/amxmodx/scripting
+          cp plugins/amxmodx_genai/include/*.inc "$SCRIPTING/include/"
+          cp plugins/include/*.inc "$SCRIPTING/include/"
           mkdir -p build
-          amxxpc plugins/amxmodx_genai/core.sma -iplugins/amxmodx_genai/include/ -iplugins/include/ -obuild/core.amxx
-          test -f build/core.amxx || { echo "Compilation failed: build/core.amxx not produced"; exit 1; }
+          amxxpc plugins/amxmodx_genai/core.sma
+          test -f core.amxx || { echo "Compilation failed: core.amxx not produced"; exit 1; }
+          mv core.amxx build/core.amxx
 
       - uses: actions/upload-artifact@v7
         with:
