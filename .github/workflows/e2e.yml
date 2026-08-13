@@ -38,6 +38,7 @@ jobs:
             rm /tmp/amxmodx.tar.gz
           fi
           echo "/tmp/amxmodx/addons/amxmodx/scripting" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/tmp/amxmodx/addons/amxmodx/scripting${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Compile plugins
         run: |
