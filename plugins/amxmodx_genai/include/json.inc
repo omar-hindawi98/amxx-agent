@@ -29,7 +29,7 @@ stock json_escape(const src[], dst[], max_dst)
 stock json_get_string(const json[], const key[], out[], maxlen)
 {
     new pattern[MAX_TOOL_NAME + 4];
-    format(pattern, sizeof(pattern) - 1, "\"%s\":\"", key);
+    format(pattern, sizeof(pattern) - 1, "^"%s^":^"", key);
 
     new pos = strfind(json, pattern);
     if (pos == -1)
@@ -60,7 +60,7 @@ stock json_get_string(const json[], const key[], out[], maxlen)
 stock json_get_int(const json[], const key[])
 {
     new pattern[MAX_TOOL_NAME + 3];
-    format(pattern, sizeof(pattern) - 1, "\"%s\":", key);
+    format(pattern, sizeof(pattern) - 1, "^"%s^":", key);
 
     new pos = strfind(json, pattern);
     if (pos == -1)
