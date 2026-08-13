@@ -6,6 +6,7 @@ import logging
 import uuid
 from typing import Any
 
+from pydantic import BaseModel, field_validator
 from strands import tool
 
 log = logging.getLogger(__name__)
@@ -14,20 +15,36 @@ log = logging.getLogger(__name__)
 _VALID_TYPES: frozenset[str] = frozenset({"string", "integer", "boolean", "number"})
 
 
-def _build_input_schema(params: list[dict]) -> dict:
+class _ToolParam(BaseModel):
+    """A single typed parameter in a plugin tool definition."""
+
+    name: str
+    type: str = "string"
+    required: bool = False
+    description: str = ""
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def _coerce_type(cls, v: object) -> str:
+        """Fall back to string for any JSON Schema type not supported by Pawn."""
+        return str(v) if str(v) in _VALID_TYPES else "string"
+
+
+def _build_input_schema(params: list[_ToolParam | dict]) -> dict:
+    """Build a JSON Schema object from validated Pawn parameter definitions."""
     properties: dict = {}
     required: list[str] = []
-    for p in params:
-        name = p.get("name")
-        if not name:
+    for raw in params:
+        try:
+            p = _ToolParam.model_validate(raw) if isinstance(raw, dict) else raw
+        except Exception:
             continue
-        json_type = p.get("type", "string") if p.get("type") in _VALID_TYPES else "string"
-        prop: dict = {"type": json_type}
-        if p.get("description"):
-            prop["description"] = p["description"]
-        properties[name] = prop
-        if p.get("required"):
-            required.append(name)
+        prop: dict = {"type": p.type}
+        if p.description:
+            prop["description"] = p.description
+        properties[p.name] = prop
+        if p.required:
+            required.append(p.name)
     schema: dict = {"type": "object", "properties": properties, "additionalProperties": False}
     if required:
         schema["required"] = required
@@ -55,8 +72,9 @@ def make_plugin_tool(
     Trust boundary: tool result content comes from the AMXMODX plugin callback and is
     returned verbatim to the model. The plugin is trusted; no sanitization is applied.
     """
-    if params:
-        input_schema = _build_input_schema(params)
+    validated = [_ToolParam.model_validate(p) for p in params] if params else None
+    if validated:
+        input_schema = _build_input_schema(validated)
 
         @tool(inputSchema={"json": input_schema})
         async def _fn(**kwargs: Any) -> str:
@@ -71,7 +89,7 @@ def make_plugin_tool(
     _fn.__name__ = name
     _fn.__doc__ = description
 
-    if params:
+    if validated:
         return _fn
     return tool(_fn)
 
@@ -83,6 +101,7 @@ async def _call(
     writer: asyncio.StreamWriter,
     session_data: dict,
 ) -> str:
+    """Send tool call to plugin, wait for result, and return content."""
     call_id = f"plug_{uuid.uuid4().hex[:8]}"
     payload = json.dumps({"type": "tool_call", "id": call_id, "name": name, "args": args})
     writer.write((payload + "\n").encode("utf-8"))
@@ -119,6 +138,7 @@ def _record(
     *,
     error: str | None = None,
 ) -> None:
+    """Record tool call outcome to session data."""
     calls: list = session_data.setdefault("calls", [])
     entry: dict = {"tool": name, "args": args}
     if error:

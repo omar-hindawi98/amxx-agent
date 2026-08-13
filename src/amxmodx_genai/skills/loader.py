@@ -5,7 +5,7 @@ from pathlib import Path
 
 from strands import AgentSkills
 
-from amxmodx_genai.config import SKILLS_PATH
+from amxmodx_genai.config import settings
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def load_plugin_skills(skill_names: list[str]) -> AgentSkills | None:
     """
     dirs: list[Path] = []
     for name in skill_names:
-        path = SKILLS_PATH / name
+        path = settings.skills_path / name
         if (path / "SKILL.md").exists():
             dirs.append(path)
         else:
