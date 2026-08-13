@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.e2e.conftest import get_handle, make_agent_result, tcp_exchange
+from tests.integration.helpers import get_handle, make_agent_result, tcp_exchange
 
 
 @pytest.mark.asyncio
@@ -82,3 +82,46 @@ async def test_unknown_skill_skipped_query_still_succeeds(unused_tcp_port, tmp_p
     assert "response" in types
     assert "done" in types
     assert not captured_kwargs.get("plugins")
+
+
+@pytest.mark.asyncio
+async def test_agent_skills_constructor_raises_query_still_succeeds(unused_tcp_port, tmp_path):
+    """When AgentSkills() raises during construction, the query completes without plugins."""
+    skill_dir = tmp_path / "badskill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("# Bad Skill")
+
+    captured_kwargs: dict = {}
+
+    def capture_agent(**kwargs):
+        captured_kwargs.update(kwargs)
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
+        return inst
+
+    def raising_skills(**kwargs):
+        raise RuntimeError("corrupted skill file")
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
+        patch("amxmodx_genai.skills.loader.settings") as mock_settings,
+        patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=raising_skills),
+    ):
+        mock_settings.skills_path = tmp_path
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            frames = await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {
+                    "type": "query",
+                    "player": 1,
+                    "prompt": "help",
+                    "tools": [],
+                    "skills": ["badskill"],
+                },
+            )
+
+    types = [f["type"] for f in frames]
+    assert "response" in types
+    assert "done" in types

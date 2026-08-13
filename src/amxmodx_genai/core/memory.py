@@ -50,6 +50,12 @@ def _make_engine(path: Path | None = None):
     def _set_wal(dbapi_conn, _):
         dbapi_conn.execute("PRAGMA journal_mode=WAL")
 
+    @event.listens_for(engine, "begin")
+    def _begin_immediate(conn):
+        # BEGIN IMMEDIATE serializes concurrent writers at the SQLite level so
+        # the read-then-write seq computation in update() is atomic.
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
+
     _Base.metadata.create_all(engine)
     return engine
 

@@ -46,11 +46,12 @@ def test_env_overrides(monkeypatch):
     assert s.model_tokens == 1024
 
 
-def test_memory_path_under_home():
+def test_memory_path_under_home(monkeypatch):
     from pathlib import Path
 
     from amxmodx_genai.config import Settings
 
+    monkeypatch.delenv("GENAI_MEMORY_PATH", raising=False)
     s = Settings()
     assert s.memory_path == Path.home() / ".local" / "share" / "amxmodx_genai" / "memory.db"
 
