@@ -77,48 +77,34 @@ def test_build_schema_skips_param_without_name():
 # ---------------------------------------------------------------------------
 
 
-def _make_writer_reader_pair():
-    """Create an asyncio.StreamReader and a mock writer that echoes tool_results."""
-    from unittest.mock import AsyncMock, MagicMock
+def _make_send_queue_pair():
+    """Create a send coroutine and a tool_result_queue that auto-replies to tool_calls."""
+    sent: list[dict] = []
+    queue: asyncio.Queue = asyncio.Queue()
 
-    writer = MagicMock(spec=asyncio.StreamWriter)
-    writer.drain = AsyncMock()
-    written: list[bytes] = []
+    async def send(obj: dict) -> None:
+        sent.append(obj)
+        if obj.get("type") == "tool_call":
+            await queue.put({"type": "tool_result", "id": obj["id"], "content": "test_result"})
 
-    reader = asyncio.StreamReader()
-
-    def capture_write(data: bytes) -> None:
-        written.append(data)
-        # Parse the tool_call and feed back a matching tool_result.
-        try:
-            msg = json.loads(data.decode().strip())
-            if msg.get("type") == "tool_call":
-                resp = json.dumps(
-                    {"type": "tool_result", "id": msg["id"], "content": "test_result"}
-                )
-                reader.feed_data((resp + "\n").encode())
-        except Exception:
-            pass
-
-    writer.write = capture_write
-    return reader, writer, written
+    return send, queue, sent
 
 
 @pytest.mark.asyncio
 async def test_no_params_tool_sends_args_string():
     """Without params, the tool accepts a free-form args string."""
-    reader, writer, written = _make_writer_reader_pair()
+    send, queue, sent = _make_send_queue_pair()
     session_data: dict = {}
 
-    t = make_plugin_tool("myplugin__get_map", "Returns map name", reader, writer, session_data)
+    t = make_plugin_tool("myplugin__get_map", "Returns map name", send, queue, "req1", session_data)
     fn = t.func if hasattr(t, "func") else t
     result = await fn(args='{"format":"short"}')
     assert result == "test_result"
 
-    sent = json.loads(b"".join(written).decode().strip())
-    assert sent["type"] == "tool_call"
-    assert sent["name"] == "myplugin__get_map"
-    assert sent["args"] == '{"format":"short"}'
+    call = next(m for m in sent if m.get("type") == "tool_call")
+    assert call["name"] == "myplugin__get_map"
+    assert call["args"] == '{"format":"short"}'
+    assert call["request_id"] == "req1"
 
 
 @pytest.mark.asyncio
@@ -127,27 +113,27 @@ async def test_with_params_tool_serializes_kwargs():
     params = [
         {"name": "player_id", "type": "integer", "required": True, "description": "Player index"},
     ]
-    reader, writer, written = _make_writer_reader_pair()
+    send, queue, sent = _make_send_queue_pair()
     session_data: dict = {}
 
     t = make_plugin_tool(
-        "myplugin__get_player", "Get player", reader, writer, session_data, params=params
+        "myplugin__get_player", "Get player", send, queue, "req2", session_data, params=params
     )
     fn = t.func if hasattr(t, "func") else t
     result = await fn(player_id=3)
     assert result == "test_result"
 
-    sent = json.loads(b"".join(written).decode().strip())
-    assert sent["name"] == "myplugin__get_player"
-    assert json.loads(sent["args"]) == {"player_id": 3}
+    call = next(m for m in sent if m.get("type") == "tool_call")
+    assert call["name"] == "myplugin__get_player"
+    assert json.loads(call["args"]) == {"player_id": 3}
 
 
 @pytest.mark.asyncio
 async def test_session_data_records_call():
-    reader, writer, _ = _make_writer_reader_pair()
+    send, queue, _ = _make_send_queue_pair()
     session_data: dict = {}
 
-    t = make_plugin_tool("myplugin__x", "X tool", reader, writer, session_data)
+    t = make_plugin_tool("myplugin__x", "X tool", send, queue, "req3", session_data)
     fn = t.func if hasattr(t, "func") else t
     await fn(args="{}")
 

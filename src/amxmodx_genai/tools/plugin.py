@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import uuid
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 from pydantic import BaseModel, field_validator
@@ -54,20 +55,16 @@ def _build_input_schema(params: list[_ToolParam | dict]) -> dict:
 def make_plugin_tool(
     name: str,
     description: str,
-    reader: asyncio.StreamReader,
-    writer: asyncio.StreamWriter,
+    send: Callable[[dict], Coroutine],
+    tool_result_queue: asyncio.Queue,
+    request_id: str,
     session_data: dict,
     params: list[dict] | None = None,
 ) -> Any:
-    """Return a Strands tool that round-trips a tool_call/tool_result over the open socket.
+    """Return a Strands tool that round-trips a tool_call/tool_result over the persistent socket.
 
-    params is a list of {"name", "type", "required", "description"} dicts from the
-    plugin registration. When provided, Strands receives a typed JSON schema so the
-    model uses the correct argument types. When absent, falls back to a single
-    free-form args string for backward compatibility.
-
-    session_data is shared across all plugin tools in the same query so the handler
-    can observe which tools fired and what they returned.
+    send is an async callable that writes one JSON message to the shared connection.
+    tool_result_queue receives tool_result messages routed by the server for this request_id.
 
     Trust boundary: tool result content comes from the AMXMODX plugin callback and is
     returned verbatim to the model. The plugin is trusted; no sanitization is applied.
@@ -79,12 +76,12 @@ def make_plugin_tool(
         @tool(inputSchema={"json": input_schema})
         async def _fn(**kwargs: Any) -> str:
             args = json.dumps(kwargs)
-            return await _call(name, args, reader, writer, session_data)
+            return await _call(name, args, send, tool_result_queue, request_id, session_data)
 
     else:
 
         async def _fn(args: str = "{}") -> str:  # type: ignore[misc]
-            return await _call(name, args, reader, writer, session_data)
+            return await _call(name, args, send, tool_result_queue, request_id, session_data)
 
     _fn.__name__ = name
     _fn.__doc__ = description
@@ -97,15 +94,22 @@ def make_plugin_tool(
 async def _call(
     name: str,
     args: str,
-    reader: asyncio.StreamReader,
-    writer: asyncio.StreamWriter,
+    send: Callable[[dict], Coroutine],
+    tool_result_queue: asyncio.Queue,
+    request_id: str,
     session_data: dict,
 ) -> str:
-    """Send tool call to plugin, wait for result, and return content."""
+    """Send tool call to plugin, wait for result from the routed queue, and return content."""
     call_id = f"plug_{uuid.uuid4().hex[:8]}"
-    payload = json.dumps({"type": "tool_call", "id": call_id, "name": name, "args": args})
-    writer.write((payload + "\n").encode("utf-8"))
-    await writer.drain()
+    await send(
+        {
+            "type": "tool_call",
+            "request_id": request_id,
+            "id": call_id,
+            "name": name,
+            "args": args,
+        }
+    )
 
     deadline = asyncio.get_running_loop().time() + 15.0
     while True:
@@ -113,25 +117,18 @@ async def _call(
         if remaining <= 0:
             _record(session_data, name, args, None, error="tool call timed out")
             return "(tool call timed out)"
-        raw = await asyncio.wait_for(reader.readline(), timeout=remaining)
-        if not raw:
-            _record(session_data, name, args, None, error="plugin closed connection")
-            return "(plugin closed connection)"
         try:
-            reply = json.loads(raw.decode("utf-8", errors="replace"))
-        except json.JSONDecodeError:
-            log.warning("malformed frame from plugin during tool call %s, skipping", call_id)
-            continue
-        if reply.get("type") == "tool_result" and reply.get("id") == call_id:
+            reply = await asyncio.wait_for(tool_result_queue.get(), timeout=remaining)
+        except TimeoutError:
+            _record(session_data, name, args, None, error="tool call timed out")
+            return "(tool call timed out)"
+        if reply.get("id") == call_id:
             content = reply.get("content", "")
             _record(session_data, name, args, content)
             return content
-        log.warning(
-            "discarding unexpected frame type=%s id=%s (expected tool_result id=%s)",
-            reply.get("type"),
-            reply.get("id"),
-            call_id,
-        )
+        # Unexpected id (shouldn't happen; tool calls within one request are sequential).
+        await tool_result_queue.put(reply)
+        await asyncio.sleep(0)
 
 
 def _record(

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "amxmodx_genai"
-version = "2.0.0"
+version = "1.0.0"
 description = "LLM agent bridge for AMXMODX game servers"
 requires-python = ">=3.11"
 authors = [{ name = "omar-hindawi98" }]
@@ -32,8 +32,6 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-m 'not live'"
-markers = ["live: requires a running sidecar (deselected by default)"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amxmodx_genai"]

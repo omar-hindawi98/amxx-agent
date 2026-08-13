@@ -55,7 +55,7 @@ jobs:
           enable-cache: true
 
       - name: Run e2e tests
-        run: uv run pytest tests/e2e/ -m live -v
+        run: uv run pytest tests/e2e/ -v
         env:
           GENAI_SIDECAR_HOST: 127.0.0.1
           GENAI_SIDECAR_PORT: 27016

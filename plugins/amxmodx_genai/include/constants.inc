@@ -16,3 +16,4 @@
 #define MAX_TOOL_PARAMS_JSON 512
 #define MAX_SKILLS           32
 #define MAX_SKILL_NAME       64
+#define MAX_REQUEST_ID       16

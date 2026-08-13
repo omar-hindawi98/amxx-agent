@@ -1,14 +1,9 @@
 """
-Live e2e tests - require a real sidecar running.
+E2e tests - require a real sidecar running.
 
-Skipped automatically when GENAI_SIDECAR_HOST is not set or the sidecar is
-unreachable. Run explicitly with:
+Run with:
 
-    GENAI_SIDECAR_HOST=127.0.0.1 pytest tests/e2e/test_e2e.py -m live
-
-Or via docker compose (uses real sidecar with Ollama):
-
-    docker compose --profile live up --abort-on-container-exit live_test
+    GENAI_SIDECAR_HOST=127.0.0.1 pytest tests/e2e/
 
 Tests assert protocol correctness and non-empty responses only.
 They do NOT assert exact LLM output - that would be brittle.
@@ -22,8 +17,6 @@ import pytest
 
 SIDECAR_HOST = os.environ.get("GENAI_SIDECAR_HOST", "")
 SIDECAR_PORT = int(os.environ.get("GENAI_SIDECAR_PORT", "27016"))
-
-pytestmark = pytest.mark.live
 
 
 async def exchange(msg: dict, *, timeout: float = 60.0) -> list[dict]:
@@ -100,24 +93,28 @@ async def test_memory_persists_within_session():
     assert "AK" in response["text"] or "ak" in response["text"].lower(), (
         f"expected AK47 in follow-up response, got: {response['text']}"
     )
-    # cleanup - allow up to 60s for LLM summarization before connection closes
+    # cleanup - send clear_memory and close the connection from our side
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write(
         (json.dumps({"type": "clear_memory", "player": 1, "session_id": session}) + "\n").encode()
     )
     await writer.drain()
-    await asyncio.wait_for(reader.read(1), timeout=60.0)
+    await asyncio.sleep(1.0)  # give sidecar time to process before we close
     writer.close()
     await writer.wait_closed()
 
 
-async def test_memory_clear_closes_connection():
-    """A clear_memory request must be accepted and the connection closed with no response bytes."""
+async def test_memory_clear_sends_no_response():
+    """A clear_memory request must be processed silently - no response bytes sent."""
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write((json.dumps({"type": "clear_memory", "player": 99}) + "\n").encode())
     await writer.drain()
-    data = await asyncio.wait_for(reader.read(1), timeout=5.0)
-    assert data == b""
+    # The server sends nothing for clear_memory; verify no bytes arrive within 1s
+    try:
+        data = await asyncio.wait_for(reader.read(1), timeout=1.0)
+        assert data == b"", f"expected no data, got {data!r}"
+    except TimeoutError:
+        pass  # timeout means no data was sent, which is correct
     writer.close()
     await writer.wait_closed()
 
