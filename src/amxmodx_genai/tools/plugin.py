@@ -101,13 +101,15 @@ async def _call(
 ) -> str:
     """Send tool call to plugin, wait for result from the routed queue, and return content."""
     call_id = f"plug_{uuid.uuid4().hex[:8]}"
-    await send({
-        "type": "tool_call",
-        "request_id": request_id,
-        "id": call_id,
-        "name": name,
-        "args": args,
-    })
+    await send(
+        {
+            "type": "tool_call",
+            "request_id": request_id,
+            "id": call_id,
+            "name": name,
+            "args": args,
+        }
+    )
 
     deadline = asyncio.get_running_loop().time() + 15.0
     while True:
@@ -117,7 +119,7 @@ async def _call(
             return "(tool call timed out)"
         try:
             reply = await asyncio.wait_for(tool_result_queue.get(), timeout=remaining)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _record(session_data, name, args, None, error="tool call timed out")
             return "(tool call timed out)"
         if reply.get("id") == call_id:

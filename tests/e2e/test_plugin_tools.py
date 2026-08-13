@@ -25,7 +25,9 @@ async def test_plugin_tool_registered_in_agent_kwargs(unused_tcp_port):
         return inst
 
     async def mock_call(name, args, reader, writer, session_data):
-        session_data.setdefault("calls", []).append({"tool": name, "args": args, "result": '{"health":100}'})
+        session_data.setdefault("calls", []).append(
+            {"tool": name, "args": args, "result": '{"health":100}'}
+        )
         return '{"health":100}'
 
     with (
@@ -46,7 +48,12 @@ async def test_plugin_tool_registered_in_agent_kwargs(unused_tcp_port):
                             "name": "get_player_info",
                             "description": "Returns player info.",
                             "params": [
-                                {"name": "player_id", "type": "integer", "required": True, "description": "player index"}
+                                {
+                                    "name": "player_id",
+                                    "type": "integer",
+                                    "required": True,
+                                    "description": "player index",
+                                }
                             ],
                         }
                     ],
@@ -67,7 +74,9 @@ async def test_plugin_tool_result_reaches_agent(unused_tcp_port):
 
     async def mock_call(name, args, reader, writer, session_data):
         call_log.append(name)
-        session_data.setdefault("calls", []).append({"tool": name, "args": args, "result": tool_return})
+        session_data.setdefault("calls", []).append(
+            {"tool": name, "args": args, "result": tool_return}
+        )
         return tool_return
 
     captured_tools: list = []
@@ -102,7 +111,12 @@ async def test_plugin_tool_result_reaches_agent(unused_tcp_port):
                             "name": "get_player_info",
                             "description": "Returns player info.",
                             "params": [
-                                {"name": "player_id", "type": "integer", "required": True, "description": "player index"}
+                                {
+                                    "name": "player_id",
+                                    "type": "integer",
+                                    "required": True,
+                                    "description": "player index",
+                                }
                             ],
                         }
                     ],
@@ -154,7 +168,12 @@ async def test_plugin_tool_calls_recorded_in_session_data(unused_tcp_port):
                             "name": "kick_player",
                             "description": "Kicks a player.",
                             "params": [
-                                {"name": "player_id", "type": "integer", "required": True, "description": "index"}
+                                {
+                                    "name": "player_id",
+                                    "type": "integer",
+                                    "required": True,
+                                    "description": "index",
+                                }
                             ],
                         }
                     ],

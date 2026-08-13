@@ -7,10 +7,10 @@ import logging
 import signal
 from typing import Any
 
+from amxmodx_genai.config import settings
 from amxmodx_genai.core.handler import handle
 from amxmodx_genai.core.model import validate as validate_model
 from amxmodx_genai.core.protocol import send_json
-from amxmodx_genai.config import settings
 
 log = logging.getLogger(__name__)
 

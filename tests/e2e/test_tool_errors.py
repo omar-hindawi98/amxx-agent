@@ -18,7 +18,7 @@ async def test_tool_call_timeout_returns_sentinel():
     session_data: dict = {}
 
     async def timeout_readline():
-        raise asyncio.TimeoutError()
+        raise TimeoutError()
 
     reader.readline = timeout_readline
 
@@ -100,7 +100,10 @@ async def test_tool_call_discards_frames_with_wrong_id():
                 break
             await asyncio.sleep(0.01)
         await frames_queue.put(
-            json.dumps({"type": "tool_result", "id": call_id_seen[0], "content": "correct_result"}).encode() + b"\n"
+            json.dumps(
+                {"type": "tool_result", "id": call_id_seen[0], "content": "correct_result"}
+            ).encode()
+            + b"\n"
         )
 
     inject_task = asyncio.create_task(inject_correct_frame())
@@ -147,7 +150,8 @@ async def test_tool_call_skips_malformed_json_frames():
                 break
             await asyncio.sleep(0.01)
         await frames_queue.put(
-            json.dumps({"type": "tool_result", "id": call_id_seen[0], "content": "valid"}).encode() + b"\n"
+            json.dumps({"type": "tool_result", "id": call_id_seen[0], "content": "valid"}).encode()
+            + b"\n"
         )
 
     inject_task = asyncio.create_task(inject_correct_frame())

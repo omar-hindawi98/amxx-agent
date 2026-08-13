@@ -45,6 +45,7 @@ async def test_invoke_retried_once_on_failure(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_invoke_fails_after_all_retries(unused_tcp_port):
     """When all retry attempts fail, handler returns an error response."""
+
     async def always_fail(prompt):
         raise RuntimeError("persistent error")
 

@@ -80,7 +80,9 @@ async def test_empty_prompt_returns_error(unused_tcp_port):
 async def test_query_response_and_done(unused_tcp_port):
     with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
         mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(return_value=make_agent_result("Buy AK47 and vesthelm."))
+        mock_instance.invoke_async = AsyncMock(
+            return_value=make_agent_result("Buy AK47 and vesthelm.")
+        )
         MockAgent.return_value = mock_instance
 
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -158,7 +160,9 @@ async def test_longterm_summary_stored_on_clear(unused_tcp_port):
         async with srv:
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
-                (json.dumps({"type": "clear_memory", "player": 7, "session_id": "7"}) + "\n").encode()
+                (
+                    json.dumps({"type": "clear_memory", "player": 7, "session_id": "7"}) + "\n"
+                ).encode()
             )
             await writer.drain()
             await asyncio.wait_for(reader.read(1), timeout=2.0)
