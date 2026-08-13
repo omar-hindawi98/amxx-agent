@@ -63,7 +63,7 @@ jobs:
             rm /tmp/amxmodx.tar.gz
           fi
           curl -sL -o /tmp/amxmodx/addons/amxmodx/scripting/include/sockets.inc \
-            https://raw.githubusercontent.com/alliedmodders/amxmodx/master/modules/sockets/scripting/include/sockets.inc
+            https://raw.githubusercontent.com/alliedmodders/amxmodx/master/plugins/include/sockets.inc
           echo "/tmp/amxmodx/addons/amxmodx/scripting" >> "$GITHUB_PATH"
           echo "LD_LIBRARY_PATH=/tmp/amxmodx/addons/amxmodx/scripting${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
