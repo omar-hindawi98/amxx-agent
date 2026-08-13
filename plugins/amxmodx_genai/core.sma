@@ -119,7 +119,7 @@ public task_poll_sockets()
         if (!g_bQueueUsed[i])
             continue;
 
-        if (!socket_is_readable(g_iQueueSocket[i], 0))
+        if (!socket_change(g_iQueueSocket[i], 0))
             continue;
 
         new chunk[512];
