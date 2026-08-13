@@ -91,7 +91,7 @@ static bool:dispatch_message(i, const line[])
 
         new reply[MAX_RESPONSE * 2 + 64];
         format(reply, sizeof(reply) - 1,
-            "{\"type\":\"tool_result\",\"id\":\"%s\",\"content\":\"%s\"}^n",
+            "{^"type^":^"tool_result^",^"id^":^"%s^",^"content^":^"%s^"}^n",
             escaped_id, escaped_result);
         socket_send_str(g_iQueueSocket[i], reply);
 
@@ -221,7 +221,7 @@ public native_query(plugin_id, num_params)
 
         new entry[MAX_TOOL_NAME * 2 + MAX_TOOL_DESC * 2 + MAX_TOOL_PARAMS_JSON + 48];
         format(entry, sizeof(entry) - 1,
-            "%s{\"name\":\"%s\",\"description\":\"%s\",\"params\":%s}",
+            "%s{^"name^":^"%s^",^"description^":^"%s^",^"params^":%s}",
             (t > 0) ? "," : "",
             escaped_name, escaped_desc, g_szToolParamsJson[t]);
         add(tools_json, sizeof(tools_json) - 1, entry);
@@ -234,7 +234,7 @@ public native_query(plugin_id, num_params)
         new escaped_skill[MAX_SKILL_NAME * 2];
         json_escape(g_szSkillName[s], escaped_skill, sizeof(escaped_skill) - 1);
         new entry[MAX_SKILL_NAME * 2 + 8];
-        format(entry, sizeof(entry) - 1, "%s\"%s\"", (s > 0) ? "," : "", escaped_skill);
+        format(entry, sizeof(entry) - 1, "%s^"%s^"", (s > 0) ? "," : "", escaped_skill);
         add(skills_json, sizeof(skills_json) - 1, entry);
     }
     add(skills_json, sizeof(skills_json) - 1, "]");
@@ -257,7 +257,7 @@ public native_query(plugin_id, num_params)
 
     new request[MAX_PROMPT * 2 + MAX_SYSTEM * 2 + MAX_TOOLS * (MAX_TOOL_NAME + MAX_TOOL_DESC + MAX_TOOL_PARAMS_JSON + 48) + MAX_SKILLS * (MAX_SKILL_NAME * 2 + 4) + 256];
     format(request, sizeof(request) - 1,
-        "{\"type\":\"query\",\"player\":%d,\"session_id\":\"%s\",\"prompt\":\"%s\",\"plugin\":\"%s\",\"system\":\"%s\",\"tools\":%s,\"skills\":%s}^n",
+        "{^"type^":^"query^",^"player^":%d,^"session_id^":^"%s^",^"prompt^":^"%s^",^"plugin^":^"%s^",^"system^":^"%s^",^"tools^":%s,^"skills^":%s}^n",
         player, escaped_session, escaped_prompt, escaped_plugin, escaped_system, tools_json, skills_json);
 
     socket_send(sock, request, strlen(request));
@@ -355,7 +355,7 @@ public native_clear_memory(plugin_id, num_params)
 
     new request[MAX_SESSION_ID * 2 + 64];
     format(request, sizeof(request) - 1,
-        "{\"type\":\"clear_memory\",\"player\":%d,\"session_id\":\"%s\"}^n",
+        "{^"type^":^"clear_memory^",^"player^":%d,^"session_id^":^"%s^"}^n",
         player, escaped_session);
     socket_send(sock, request, strlen(request));
     socket_close(sock);
@@ -429,7 +429,7 @@ public native_add_tool_param(plugin_id, num_params)
 
     new entry[400];
     format(entry, sizeof(entry) - 1,
-        "{\"name\":\"%s\",\"type\":\"%s\",\"required\":%s,\"description\":\"%s\"}",
+        "{^"name^":^"%s^",^"type^":^"%s^",^"required^":%s,^"description^":^"%s^"}",
         escaped_name, escaped_type,
         required ? "true" : "false",
         escaped_desc);
