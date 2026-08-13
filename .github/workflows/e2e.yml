@@ -31,6 +31,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends lib32gcc-s1 lib32stdc++6
           if [ "${{ steps.cache-amxmodx.outputs.cache-hit }}" != "true" ]; then
+            mkdir -p /tmp/amxmodx
             curl -sL https://www.amxmodx.org/release/amxmodx-1.8.2-base-linux.tar.gz \
               | tar xzf - -C /tmp/amxmodx
           fi
