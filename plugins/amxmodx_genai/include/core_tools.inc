@@ -3,6 +3,9 @@
 #endif
 #define _amxgenai_core_tools_included
 
+native genai_register_tool(const name[], const description[], const callback[]);
+native genai_add_tool_param(const name[], const type[], bool:required, const description[]);
+
 stock register_core_tools()
 {
     genai_register_tool(
