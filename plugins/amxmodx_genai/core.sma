@@ -3,6 +3,7 @@
 #include <constants>
 #include <json>
 #include <queue>
+#include <core_tools>
 
 #define PLUGIN  "GenAI Core"
 #define VERSION "2.0.0" // {x-release-please-version}
@@ -12,6 +13,7 @@
 
 new g_pCvarHost;
 new g_pCvarPort;
+new g_pCvarCoreTools;
 
 // ---- plugin lifecycle -------------------------------------------------------
 
@@ -19,8 +21,9 @@ public plugin_init()
 {
     register_plugin(PLUGIN, VERSION, AUTHOR);
 
-    g_pCvarHost = register_cvar("genai_host", "127.0.0.1");
-    g_pCvarPort = register_cvar("genai_port", "27016");
+    g_pCvarHost       = register_cvar("genai_host",        "127.0.0.1");
+    g_pCvarPort       = register_cvar("genai_port",        "27016");
+    g_pCvarCoreTools  = register_cvar("genai_core_tools",  "1");
 
     g_tSystemPrompts = TrieCreate();
 
@@ -35,6 +38,9 @@ public plugin_init()
     register_native("genai_register_tool",         "native_register_tool");
     register_native("genai_add_tool_param",        "native_add_tool_param");
     register_native("genai_register_skill",        "native_register_skill");
+
+    if (get_pcvar_num(g_pCvarCoreTools))
+        register_core_tools();
 
     for (new i = 0; i < MAX_QUEUE; i++)
         g_iQueueSocket[i] = -1;
@@ -459,3 +465,4 @@ public native_register_skill(plugin_id, num_params)
     format(g_szSkillName[g_iSkillCount], MAX_SKILL_NAME - 1, "%s__%s", prefix, name);
     g_iSkillCount++;
 }
+

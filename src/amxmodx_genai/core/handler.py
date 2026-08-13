@@ -15,7 +15,7 @@ from strands import Agent
 from amxmodx_genai.config import settings
 from amxmodx_genai.core import memory
 from amxmodx_genai.core.messages import ClearMemoryMsg, QueryMsg
-from amxmodx_genai.core.model import make_model
+from amxmodx_genai.core.model import get_model
 from amxmodx_genai.core.protocol import read_json, send_json
 from amxmodx_genai.core.summarize import summarize_session
 from amxmodx_genai.skills import load_builtin_skills, load_plugin_skills
@@ -105,7 +105,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
                 plugins.append(plugin_skills)
 
         agent_kwargs: dict = {
-            "model": make_model(),
+            "model": get_model(),
             "system_prompt": full_system,
             "tools": plugin_tools + (native_tools if settings.model_backend != "ollama" else []),
             "messages": player_history,

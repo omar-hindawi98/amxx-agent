@@ -5,7 +5,7 @@ restarts. Sessions are keyed by arbitrary string IDs chosen by the plugin:
 player index string ("3"), team name ("ct_team"), or any custom key.
 
 Two tiers:
-- Short-term (sessions table): raw message turns, capped at 20. Cleared on clear().
+- Short-term (sessions table): raw message turns, capped at GENAI_MEMORY_MAX_MESSAGES. Cleared on clear().
 - Long-term (longterm table): LLM-generated summary from past sessions. Survives clear().
 """
 
@@ -17,8 +17,6 @@ from sqlalchemy import Integer, String, Text, create_engine, delete, event, sele
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from amxmodx_genai.config import settings
-
-_MAX_MESSAGES = 20
 
 
 class _Base(DeclarativeBase):
@@ -56,7 +54,12 @@ def _make_engine(path: Path | None = None):
     return engine
 
 
-_engine = _make_engine()
+try:
+    _engine = _make_engine()
+except Exception as exc:
+    raise RuntimeError(
+        f"Failed to initialize memory database at {settings.memory_path}: {exc}"
+    ) from exc
 
 
 def get(session_id: str) -> list[dict]:
@@ -71,7 +74,7 @@ def get(session_id: str) -> list[dict]:
 
 
 def update(session_id: str, prompt: str, response: str) -> None:
-    """Append a user/assistant turn and trim the session to _MAX_MESSAGES rows."""
+    """Append a user/assistant turn and trim the session to memory_max_messages rows."""
     with Session(_engine) as db, db.begin():
         max_seq = db.scalar(
             select(_SessionRow.seq)
@@ -100,7 +103,7 @@ def update(session_id: str, prompt: str, response: str) -> None:
             select(_SessionRow.seq)
             .where(_SessionRow.session_id == session_id)
             .order_by(_SessionRow.seq.desc())
-            .limit(_MAX_MESSAGES)
+            .limit(settings.memory_max_messages)
         ).all()
         db.execute(
             delete(_SessionRow)
