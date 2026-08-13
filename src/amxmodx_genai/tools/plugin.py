@@ -107,9 +107,9 @@ async def _call(
     writer.write((payload + "\n").encode("utf-8"))
     await writer.drain()
 
-    deadline = asyncio.get_event_loop().time() + 15.0
+    deadline = asyncio.get_running_loop().time() + 15.0
     while True:
-        remaining = deadline - asyncio.get_event_loop().time()
+        remaining = deadline - asyncio.get_running_loop().time()
         if remaining <= 0:
             _record(session_data, name, args, None, error="tool call timed out")
             return "(tool call timed out)"

@@ -3,19 +3,31 @@
 from amxmodx_genai.config import settings
 
 _SUPPORTED = ("anthropic", "bedrock", "ollama", "litellm", "openai")
-
 _OLLAMA_DEFAULT_ENDPOINT = "http://localhost:11434"
+_NEEDS_API_KEY = frozenset({"anthropic", "openai", "litellm"})
+
+_cached_model = None
 
 
 def validate() -> None:
     """Raise at startup if required credentials for the configured backend are missing."""
     backend = settings.model_backend
-    if backend == "anthropic" and not settings.model_api_key:
-        raise RuntimeError("GENAI_MODEL_API_KEY is required when GENAI_MODEL_BACKEND=anthropic")
+    if backend in _NEEDS_API_KEY and not settings.model_api_key:
+        raise RuntimeError(
+            f"GENAI_MODEL_API_KEY is required when GENAI_MODEL_BACKEND={backend}"
+        )
 
 
-def make_model():
-    """Return a Strands model for the configured backend.
+def get_model():
+    """Return the cached Strands model, constructing it on first call."""
+    global _cached_model
+    if _cached_model is None:
+        _cached_model = _build_model()
+    return _cached_model
+
+
+def _build_model():
+    """Construct a new Strands model for the configured backend.
 
     Supported backends (GENAI_MODEL_BACKEND):
       anthropic - Anthropic API (default); requires GENAI_MODEL_API_KEY
