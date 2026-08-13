@@ -11,7 +11,7 @@ stock json_escape(const src[], dst[], max_dst)
     new len = strlen(src);
     for (new i = 0; i < len && j < max_dst - 2; i++) {
         new c = src[i];
-        if (c == '"' || c == '\\') {
+        if (c == 34 || c == '\\') {
             dst[j++] = '\\';
         } else if (c == 10) {
             dst[j++] = '\\';
@@ -40,14 +40,14 @@ stock json_get_string(const json[], const key[], out[], maxlen)
     new len = strlen(json);
     while (pos < len && j < maxlen - 1) {
         new c = json[pos];
-        if (c == '"')
+        if (c == 34)
             break;
         if (c == '\\' && pos + 1 < len) {
             pos++;
             c = json[pos];
-            if (c == 'n')                   { out[j++] = 10; pos++; continue; }
-            else if (c == 'r')              { out[j++] = 13; pos++; continue; }
-            else if (c == '"' || c == '\\') { out[j++] = c;  pos++; continue; }
+            if (c == 'n')               { out[j++] = 10; pos++; continue; }
+            else if (c == 'r')          { out[j++] = 13; pos++; continue; }
+            else if (c == 34 || c == '\\') { out[j++] = c;  pos++; continue; }
         }
         out[j++] = c;
         pos++;
