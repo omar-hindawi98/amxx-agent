@@ -1,23 +1,23 @@
-import os
+"""Unit tests for persistent session memory."""
+
 import sys
+from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture(autouse=True)
 def fresh_memory(tmp_path):
-    db_file = str(tmp_path / "test_memory.db")
-    os.environ["GENAI_MEMORY_PATH"] = db_file
-
-    # Force re-import so config and thread-local connections use the new path.
+    # Clear cached modules so each test gets a fresh import.
     for mod in list(sys.modules):
         if mod.startswith("amxmodx_genai"):
             del sys.modules[mod]
 
+    import amxmodx_genai.core.memory as mem
+    mem._engine = mem._make_engine(tmp_path / "test_memory.db")
+
     yield
 
-    # Cleanup env var; modules will be re-imported fresh next test.
-    del os.environ["GENAI_MEMORY_PATH"]
     for mod in list(sys.modules):
         if mod.startswith("amxmodx_genai"):
             del sys.modules[mod]
@@ -38,8 +38,8 @@ def test_update_and_get():
     mem.update("1", "what should I buy?", "Buy AK47.")
     result = mem.get("1")
     assert len(result) == 2
-    assert result[0] == {"role": "user", "content": [{"text": "what should I buy?"}]}
-    assert result[1] == {"role": "assistant", "content": [{"text": "Buy AK47."}]}
+    assert result[0] == {"role": "user", "content": [{"type": "text", "text": "what should I buy?"}]}
+    assert result[1] == {"role": "assistant", "content": [{"type": "text", "text": "Buy AK47."}]}
 
 
 def test_update_accumulates():
@@ -133,22 +133,22 @@ def test_longterm_sessions_isolated():
 
 
 def test_persists_across_reimport(tmp_path):
-    db_file = str(tmp_path / "persist_test.db")
-    os.environ["GENAI_MEMORY_PATH"] = db_file
+    db_path = tmp_path / "persist_test.db"
     for mod in list(sys.modules):
         if mod.startswith("amxmodx_genai"):
             del sys.modules[mod]
 
     import amxmodx_genai.core.memory as mem1
-
+    mem1._engine = mem1._make_engine(db_path)
     mem1.update("42", "hello", "world")
 
-    # Simulate restart: clear modules and re-import.
+    # Simulate restart: clear modules and re-import with the same DB path.
     for mod in list(sys.modules):
         if mod.startswith("amxmodx_genai"):
             del sys.modules[mod]
 
     import amxmodx_genai.core.memory as mem2
+    mem2._engine = mem2._make_engine(db_path)
 
     result = mem2.get("42")
     assert len(result) == 2
