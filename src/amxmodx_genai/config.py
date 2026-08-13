@@ -45,11 +45,7 @@ class Settings(BaseSettings):
         """Lowercase the backend name so 'Ollama' and 'OLLAMA' both work."""
         return str(v).lower()
 
-    @computed_field
-    @property
-    def memory_path(self) -> Path:
-        """SQLite database path for conversation memory."""
-        return Path.home() / ".local" / "share" / "amxmodx_genai" / "memory.db"
+    memory_path: Path = Path.home() / ".local" / "share" / "amxmodx_genai" / "memory.db"
 
     @computed_field
     @property

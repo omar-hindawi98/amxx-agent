@@ -96,6 +96,45 @@ async def _handle_persistent(
             await writer.wait_closed()
 
 
+async def handle_once(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+) -> None:
+    """Handle exactly one request on a connection then close - for testing."""
+    global _sem
+    if _sem is None:
+        _sem = asyncio.Semaphore(8)
+
+    write_lock = asyncio.Lock()
+
+    async def send(obj: dict[str, Any]) -> None:
+        async with write_lock:
+            send_json(writer, obj)
+            await writer.drain()
+
+    line = await reader.readline()
+    if not line:
+        writer.close()
+        with contextlib.suppress(Exception):
+            await writer.wait_closed()
+        return
+
+    try:
+        msg = json.loads(line.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        writer.close()
+        with contextlib.suppress(Exception):
+            await writer.wait_closed()
+        return
+
+    q: asyncio.Queue = asyncio.Queue()
+    await _bounded_handle(msg, send, q)
+
+    writer.close()
+    with contextlib.suppress(Exception):
+        await writer.wait_closed()
+
+
 async def _bounded_handle(
     msg: dict[str, Any],
     send: Any,

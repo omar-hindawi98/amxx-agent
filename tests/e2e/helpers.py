@@ -6,14 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 
 def get_handle():
-    import amxmodx_genai.server as server_mod
-    from amxmodx_genai.server import _handle_persistent
+    from amxmodx_genai.server import handle_once
 
-    if server_mod._sem is None:
-        import asyncio
-
-        server_mod._sem = asyncio.Semaphore(8)
-    return _handle_persistent
+    return handle_once
 
 
 def make_agent_result(text: str) -> MagicMock:
