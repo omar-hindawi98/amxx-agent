@@ -103,7 +103,7 @@ def update(session_id: str, prompt: str, response: str) -> None:
             select(_SessionRow.seq)
             .where(_SessionRow.session_id == session_id)
             .order_by(_SessionRow.seq.desc())
-            .limit(settings.memory_max_messages)
+            .limit(settings.memory_max_messages * 2)
         ).all()
         db.execute(
             delete(_SessionRow)

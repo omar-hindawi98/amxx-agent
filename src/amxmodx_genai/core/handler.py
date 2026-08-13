@@ -8,7 +8,9 @@ import contextlib
 import json
 import logging
 import re
+from collections.abc import Callable, Coroutine
 from pathlib import Path
+from typing import Any
 
 from strands import Agent
 
@@ -16,7 +18,6 @@ from amxmodx_genai.config import settings
 from amxmodx_genai.core import memory
 from amxmodx_genai.core.messages import ClearMemoryMsg, QueryMsg
 from amxmodx_genai.core.model import get_model
-from amxmodx_genai.core.protocol import read_json, send_json
 from amxmodx_genai.core.summarize import summarize_session
 from amxmodx_genai.skills import load_builtin_skills, load_plugin_skills
 from amxmodx_genai.tools import make_plugin_tool, native_tools
@@ -33,15 +34,27 @@ _MAX_RETRIES = 1
 # Loaded once at import time; None when no built-in skills exist.
 _BUILTIN_SKILLS = load_builtin_skills()
 
+# Type alias for the send callable passed in by the server.
+_Send = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
 
-async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-    """Handle a single client connection, process request, and send response."""
-    addr = writer.get_extra_info("peername")
+
+async def handle(
+    msg: dict[str, Any],
+    send: _Send,
+    tool_result_queue: asyncio.Queue,
+) -> None:
+    """Handle one request from the persistent connection.
+
+    msg      - already-parsed JSON dict from the plugin
+    send     - async callable that writes one JSON object to the shared socket (thread-safe)
+    tool_result_queue - asyncio.Queue that receives tool_result messages routed for this request
+    """
+    request_id = msg.get("request_id", "")
+
+    async def _send(obj: dict[str, Any]) -> None:
+        await send({**obj, "request_id": request_id})
+
     try:
-        msg = await read_json(reader, timeout=10.0)
-        if msg is None:
-            return
-
         if msg.get("type") == "clear_memory":
             req = ClearMemoryMsg.model_validate(msg)
             session_id = req.session_id or str(req.player)
@@ -68,9 +81,8 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         skill_names = req.skills
 
         if not prompt:
-            send_json(writer, {"type": "response", "text": "(empty prompt)"})
-            send_json(writer, {"type": "done"})
-            await writer.drain()
+            await _send({"type": "response", "text": "(empty prompt)"})
+            await _send({"type": "done"})
             return
 
         # Prefetch both memory tiers concurrently while building tool list.
@@ -82,8 +94,9 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             make_plugin_tool(
                 t.name,
                 t.description,
-                reader,
-                writer,
+                _send,
+                tool_result_queue,
+                request_id,
                 session_data,
                 params=t.params or None,
             )
@@ -137,9 +150,8 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
 
         await asyncio.to_thread(memory.update, session_id, prompt, clean_text)
 
-        send_json(writer, {"type": "response", "text": clean_text})
-        send_json(writer, {"type": "done"})
-        await writer.drain()
+        await _send({"type": "response", "text": clean_text})
+        await _send({"type": "done"})
 
         log.info(
             "session=%s player=%d tools_called=%d response_len=%d",
@@ -150,18 +162,14 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         )
 
     except TimeoutError:
-        log.warning("timeout from %s", addr)
-        _send_error(writer, "(request timed out)")
+        log.warning("request timed out (request_id=%s)", request_id)
+        await _safe_send_error(_send, "(request timed out)")
     except json.JSONDecodeError as e:
-        log.warning("bad JSON from %s: %s", addr, e)
-        _send_error(writer, "(invalid request)")
+        log.warning("bad JSON in request (request_id=%s): %s", request_id, e)
+        await _safe_send_error(_send, "(invalid request)")
     except Exception as e:
-        log.exception("unexpected error from %s: %s", addr, e)
-        _send_error(writer, "(AI unavailable)")
-    finally:
-        writer.close()
-        with contextlib.suppress(Exception):
-            await writer.wait_closed()
+        log.exception("unexpected error (request_id=%s): %s", request_id, e)
+        await _safe_send_error(_send, "(AI unavailable)")
 
 
 async def _invoke_with_retry(agent_kwargs: dict, prompt: str):
@@ -204,8 +212,7 @@ def _shift_headings(text: str) -> str:
     )
 
 
-def _send_error(writer: asyncio.StreamWriter, text: str) -> None:
-    """Send error response and done message to client."""
+async def _safe_send_error(send: _Send, text: str) -> None:
     with contextlib.suppress(Exception):
-        send_json(writer, {"type": "response", "text": text})
-        send_json(writer, {"type": "done"})
+        await send({"type": "response", "text": text})
+        await send({"type": "done"})

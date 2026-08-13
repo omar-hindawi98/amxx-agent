@@ -6,7 +6,7 @@
 #include <core_tools>
 
 #define PLUGIN  "GenAI Core"
-#define VERSION "1.0.0" // {x-release-please-version}
+#define VERSION "2.0.0" // {x-release-please-version}
 #define AUTHOR  "omar-hindawi98"
 
 // ---- cvars ------------------------------------------------------------------
@@ -41,11 +41,6 @@ public plugin_init()
 
     if (get_pcvar_num(g_pCvarCoreTools))
         register_core_tools();
-
-    for (new i = 0; i < MAX_QUEUE; i++)
-        g_iQueueSocket[i] = -1;
-
-    set_task(0.1, "task_poll_sockets");
 }
 
 public plugin_end()
@@ -53,7 +48,38 @@ public plugin_end()
     for (new i = 0; i < MAX_QUEUE; i++)
         if (g_bQueueUsed[i])
             free_slot(i);
+
+    if (g_iMainSocket != -1) {
+        socket_close(g_iMainSocket);
+        g_iMainSocket = -1;
+    }
+
     TrieDestroy(g_tSystemPrompts);
+}
+
+// ---- connection helpers -----------------------------------------------------
+
+static bool:ensure_connected()
+{
+    if (g_iMainSocket != -1)
+        return true;
+
+    new host[64];
+    get_pcvar_string(g_pCvarHost, host, 63);
+    new port = get_pcvar_num(g_pCvarPort);
+
+    new err;
+    g_iMainSocket = socket_open(host, port, SOCKET_TCP, err);
+    if (g_iMainSocket == -1 || err != 0) {
+        g_iMainSocket = socket_open(host, port, SOCKET_TCP, err);
+        if (g_iMainSocket == -1 || err != 0) {
+            g_iMainSocket = -1;
+            log_amx("[GenAI] socket_open failed (err %d)", err);
+            return false;
+        }
+        log_amx("[GenAI] socket_open succeeded on retry");
+    }
+    return true;
 }
 
 // ---- socket poll ------------------------------------------------------------
@@ -95,11 +121,11 @@ static bool:dispatch_message(i, const line[])
         json_escape(tool_id,  escaped_id,     sizeof(escaped_id)     - 1);
         json_escape(result,   escaped_result, sizeof(escaped_result) - 1);
 
-        new reply[MAX_RESPONSE * 2 + 64];
+        new reply[MAX_RESPONSE * 2 + 128];
         format(reply, sizeof(reply) - 1,
-            "{^"type^":^"tool_result^",^"id^":^"%s^",^"content^":^"%s^"}^n",
-            escaped_id, escaped_result);
-        socket_send_str(g_iQueueSocket[i], reply);
+            "{^"type^":^"tool_result^",^"request_id^":^"%s^",^"id^":^"%s^",^"content^":^"%s^"}^n",
+            g_szQueueRequestId[i], escaped_id, escaped_result);
+        socket_send_str(g_iMainSocket, reply);
 
     } else if (equal(msg_type, "response")) {
         new text[MAX_RESPONSE];
@@ -121,54 +147,68 @@ static bool:dispatch_message(i, const line[])
 
 public task_poll_sockets()
 {
-    for (new i = 0; i < MAX_QUEUE; i++) {
-        if (!g_bQueueUsed[i])
-            continue;
-
-        if (!socket_change(g_iQueueSocket[i], 0))
-            continue;
-
+    if (g_iMainSocket != -1 && socket_change(g_iMainSocket, 0)) {
         new chunk[512];
-        new bytes = socket_recv(g_iQueueSocket[i], chunk, sizeof(chunk) - 1);
+        new bytes = socket_recv(g_iMainSocket, chunk, sizeof(chunk) - 1);
 
         if (bytes <= 0) {
-            callfunc_begin(g_szQueueCallback[i], g_szQueuePlugin[i]);
-            callfunc_push_int(g_iQueuePlayer[i]);
-            callfunc_push_str("(AI connection dropped)");
-            callfunc_end();
-            free_slot(i);
-            continue;
-        }
+            // Connection dropped - fire error callback for every in-flight query.
+            for (new i = 0; i < MAX_QUEUE; i++) {
+                if (!g_bQueueUsed[i])
+                    continue;
+                callfunc_begin(g_szQueueCallback[i], g_szQueuePlugin[i]);
+                callfunc_push_int(g_iQueuePlayer[i]);
+                callfunc_push_str("(AI connection dropped)");
+                callfunc_end();
+                free_slot(i);
+            }
+            socket_close(g_iMainSocket);
+            g_iMainSocket = -1;
+        } else {
+            new buf_space = sizeof(g_szMainBuf) - g_iMainBufLen - 1;
+            if (bytes > buf_space)
+                bytes = buf_space;
+            for (new c = 0; c < bytes; c++)
+                g_szMainBuf[g_iMainBufLen + c] = chunk[c];
+            g_iMainBufLen += bytes;
+            g_szMainBuf[g_iMainBufLen] = 0;
 
-        new buf_space = MAX_RESPONSE - g_iQueueBufLen[i] - 1;
-        if (bytes > buf_space)
-            bytes = buf_space;
+            new nl;
+            while ((nl = strfind(g_szMainBuf, "^n")) != -1) {
+                new line[MAX_RESPONSE];
+                new copy_len = (nl < MAX_RESPONSE - 1) ? nl : MAX_RESPONSE - 2;
+                for (new c = 0; c < copy_len; c++)
+                    line[c] = g_szMainBuf[c];
+                line[copy_len] = 0;
 
-        for (new c = 0; c < bytes; c++)
-            g_szQueueBuf[i][g_iQueueBufLen[i] + c] = chunk[c];
-        g_iQueueBufLen[i] += bytes;
-        g_szQueueBuf[i][g_iQueueBufLen[i]] = 0;
+                new remaining = g_iMainBufLen - nl - 1;
+                for (new c = 0; c < remaining; c++)
+                    g_szMainBuf[c] = g_szMainBuf[nl + 1 + c];
+                g_iMainBufLen = remaining;
+                g_szMainBuf[remaining] = 0;
 
-        new nl;
-        while ((nl = strfind(g_szQueueBuf[i], "^n")) != -1) {
-            new line[MAX_RESPONSE];
-            new copy_len = (nl < MAX_RESPONSE - 1) ? nl : MAX_RESPONSE - 2;
-            for (new c = 0; c < copy_len; c++)
-                line[c] = g_szQueueBuf[i][c];
-            line[copy_len] = 0;
+                new request_id[MAX_REQUEST_ID];
+                json_get_string(line, "request_id", request_id, sizeof(request_id) - 1);
 
-            new remaining = g_iQueueBufLen[i] - nl - 1;
-            for (new c = 0; c < remaining; c++)
-                g_szQueueBuf[i][c] = g_szQueueBuf[i][nl + 1 + c];
-            g_iQueueBufLen[i] = remaining;
-            g_szQueueBuf[i][remaining] = 0;
-
-            if (dispatch_message(i, line))
-                break;
+                new slot = find_slot_by_request_id(request_id);
+                if (slot != -1)
+                    dispatch_message(slot, line);
+            }
         }
     }
 
-    set_task(0.1, "task_poll_sockets");
+    // Only reschedule while there are in-flight queries.
+    new bool:has_active = false;
+    for (new i = 0; i < MAX_QUEUE; i++) {
+        if (g_bQueueUsed[i]) {
+            has_active = true;
+            break;
+        }
+    }
+    if (has_active)
+        set_task(0.1, "task_poll_sockets");
+    else
+        g_bPolling = false;
 }
 
 // ---- natives ----------------------------------------------------------------
@@ -183,12 +223,15 @@ public native_query(plugin_id, num_params)
     new callback[MAX_CALLBACK];
     get_string(3, callback, MAX_CALLBACK - 1);
 
-    // optional session_id - defaults to player index string
+    // optional session_id - defaults to SteamID (stable across reconnects), then player index
     new session_id[MAX_SESSION_ID];
     if (num_params >= 4)
         get_string(4, session_id, MAX_SESSION_ID - 1);
-    if (!session_id[0])
-        num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0]) {
+        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
+        if (!session_id[0])
+            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    }
 
     new slot = find_free_slot();
     if (slot == -1) {
@@ -196,20 +239,13 @@ public native_query(plugin_id, num_params)
         return -1;
     }
 
-    new host[64];
-    get_pcvar_string(g_pCvarHost, host, 63);
-    new port = get_pcvar_num(g_pCvarPort);
+    if (!ensure_connected())
+        return -1;
 
-    new err;
-    new sock = socket_open(host, port, SOCKET_TCP, err);
-    if (sock == -1 || err != 0) {
-        sock = socket_open(host, port, SOCKET_TCP, err);
-        if (sock == -1 || err != 0) {
-            log_amx("[GenAI] socket_open failed after retry (err %d)", err);
-            return -1;
-        }
-        log_amx("[GenAI] socket_open succeeded on retry");
-    }
+    // Assign a unique request_id for multiplexing over the persistent socket.
+    g_iRequestCounter++;
+    new request_id[MAX_REQUEST_ID];
+    num_to_str(g_iRequestCounter, request_id, MAX_REQUEST_ID - 1);
 
     new plugin_filename[MAX_PLUGIN_NAME];
     get_plugin(plugin_id, plugin_filename, MAX_PLUGIN_NAME - 1);
@@ -256,27 +292,33 @@ public native_query(plugin_id, num_params)
     new escaped_system[MAX_SYSTEM * 2];
     new escaped_session[MAX_SESSION_ID * 2];
     new escaped_plugin[MAX_PLUGIN_NAME * 2];
+    new escaped_rid[MAX_REQUEST_ID * 2];
     json_escape(prompt,        escaped_prompt,  sizeof(escaped_prompt)  - 1);
     json_escape(system_prompt, escaped_system,  sizeof(escaped_system)  - 1);
     json_escape(session_id,    escaped_session, sizeof(escaped_session) - 1);
     json_escape(plugin_name,   escaped_plugin,  sizeof(escaped_plugin)  - 1);
+    json_escape(request_id,    escaped_rid,     sizeof(escaped_rid)     - 1);
 
-    new request[MAX_PROMPT * 2 + MAX_SYSTEM * 2 + MAX_TOOLS * (MAX_TOOL_NAME + MAX_TOOL_DESC + MAX_TOOL_PARAMS_JSON + 48) + MAX_SKILLS * (MAX_SKILL_NAME * 2 + 4) + 256];
+    new request[MAX_PROMPT * 2 + MAX_SYSTEM * 2 + MAX_TOOLS * (MAX_TOOL_NAME + MAX_TOOL_DESC + MAX_TOOL_PARAMS_JSON + 48) + MAX_SKILLS * (MAX_SKILL_NAME * 2 + 4) + 320];
     format(request, sizeof(request) - 1,
-        "{^"type^":^"query^",^"player^":%d,^"session_id^":^"%s^",^"prompt^":^"%s^",^"plugin^":^"%s^",^"system^":^"%s^",^"tools^":%s,^"skills^":%s}^n",
-        player, escaped_session, escaped_prompt, escaped_plugin, escaped_system, tools_json, skills_json);
+        "{^"type^":^"query^",^"request_id^":^"%s^",^"player^":%d,^"session_id^":^"%s^",^"prompt^":^"%s^",^"plugin^":^"%s^",^"system^":^"%s^",^"tools^":%s,^"skills^":%s}^n",
+        escaped_rid, player, escaped_session, escaped_prompt, escaped_plugin, escaped_system, tools_json, skills_json);
 
-    socket_send(sock, request, strlen(request));
+    socket_send(g_iMainSocket, request, strlen(request));
 
-    g_bQueueUsed[slot]         = true;
-    g_iQueuePlayer[slot]       = player;
-    g_iQueueSocket[slot]       = sock;
-    g_iQueueBufLen[slot]       = 0;
-    g_szQueueBuf[slot][0]      = 0;
-    g_szQueueResponse[slot][0] = 0;
+    g_bQueueUsed[slot]        = true;
+    g_iQueuePlayer[slot]      = player;
+    copy(g_szQueueRequestId[slot],  MAX_REQUEST_ID  - 1, request_id);
     copy(g_szQueueCallback[slot],   MAX_CALLBACK    - 1, callback);
     copy(g_szQueuePlugin[slot],     MAX_PLUGIN_NAME - 1, plugin_filename);
     copy(g_szQueueSessionId[slot],  MAX_SESSION_ID  - 1, session_id);
+    g_szQueueResponse[slot][0] = 0;
+
+    // Kick off the poll task if it is not already running.
+    if (!g_bPolling) {
+        g_bPolling = true;
+        set_task(0.1, "task_poll_sockets");
+    }
 
     return slot;
 }
@@ -287,8 +329,11 @@ public native_cancel(plugin_id, num_params)
     new session_id[MAX_SESSION_ID];
     if (num_params >= 2)
         get_string(2, session_id, MAX_SESSION_ID - 1);
-    if (!session_id[0])
-        num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0]) {
+        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
+        if (!session_id[0])
+            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    }
 
     new slot = find_session_slot(session_id, player);
     if (slot != -1)
@@ -301,8 +346,11 @@ public native_is_pending(plugin_id, num_params)
     new session_id[MAX_SESSION_ID];
     if (num_params >= 2)
         get_string(2, session_id, MAX_SESSION_ID - 1);
-    if (!session_id[0])
-        num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0]) {
+        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
+        if (!session_id[0])
+            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    }
 
     return (find_session_slot(session_id, player) != -1) ? 1 : 0;
 }
@@ -344,27 +392,23 @@ public native_clear_memory(plugin_id, num_params)
     new session_id[MAX_SESSION_ID];
     if (num_params >= 2)
         get_string(2, session_id, MAX_SESSION_ID - 1);
-    if (!session_id[0])
-        num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0]) {
+        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
+        if (!session_id[0])
+            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    }
 
-    new host[64];
-    get_pcvar_string(g_pCvarHost, host, 63);
-    new port = get_pcvar_num(g_pCvarPort);
-
-    new err;
-    new sock = socket_open(host, port, SOCKET_TCP, err);
-    if (sock == -1 || err != 0)
+    if (!ensure_connected())
         return;
 
     new escaped_session[MAX_SESSION_ID * 2];
     json_escape(session_id, escaped_session, sizeof(escaped_session) - 1);
 
-    new request[MAX_SESSION_ID * 2 + 64];
+    new request[MAX_SESSION_ID * 2 + 96];
     format(request, sizeof(request) - 1,
-        "{^"type^":^"clear_memory^",^"player^":%d,^"session_id^":^"%s^"}^n",
+        "{^"type^":^"clear_memory^",^"request_id^":^"0^",^"player^":%d,^"session_id^":^"%s^"}^n",
         player, escaped_session);
-    socket_send(sock, request, strlen(request));
-    socket_close(sock);
+    socket_send(g_iMainSocket, request, strlen(request));
 }
 
 public native_register_tool(plugin_id, num_params)
@@ -465,4 +509,3 @@ public native_register_skill(plugin_id, num_params)
     format(g_szSkillName[g_iSkillCount], MAX_SKILL_NAME - 1, "%s__%s", prefix, name);
     g_iSkillCount++;
 }
-
