@@ -38,9 +38,15 @@ async def summarize_session(history: list[dict], prior_summary: str) -> str:
     text = ""
     result_msg = getattr(result, "message", None)
     if result_msg:
-        content = result_msg.get("content", []) if isinstance(result_msg, dict) else getattr(result_msg, "content", [])
+        content = (
+            result_msg.get("content", [])
+            if isinstance(result_msg, dict)
+            else getattr(result_msg, "content", [])
+        )
         for block in content:
-            block_text = block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+            block_text = (
+                block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+            )
             if block_text:
                 text += block_text
     return text.strip()
