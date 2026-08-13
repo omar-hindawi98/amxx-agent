@@ -31,7 +31,7 @@ services:
       - GENAI_MODEL_BACKEND=${GENAI_MODEL_BACKEND:-anthropic}
       - GENAI_MODEL_NAME=${GENAI_MODEL_NAME:-}
       - GENAI_MODEL_ENDPOINT=http://ollama:11434
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GENAI_MODEL_API_KEY=${GENAI_MODEL_API_KEY:-}
     ports:
       - "27016:27016"
     depends_on:

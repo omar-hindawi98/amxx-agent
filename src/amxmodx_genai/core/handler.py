@@ -112,9 +112,7 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         if plugins:
             agent_kwargs["plugins"] = plugins
 
-        agent = Agent(**agent_kwargs)
-
-        result = await _invoke_with_retry(agent, prompt)
+        result = await _invoke_with_retry(agent_kwargs, prompt)
 
         final_text = ""
         result_msg = getattr(result, "message", None)
@@ -126,6 +124,9 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
                     final_text += text
 
         clean_text = final_text.strip().replace("\n", " ").strip()
+        if not clean_text:
+            log.warning("agent returned no text for session=%s", session_id)
+            clean_text = "(no response)"
 
         await asyncio.to_thread(memory.update, session_id, prompt, clean_text)
 
@@ -156,12 +157,12 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             await writer.wait_closed()
 
 
-async def _invoke_with_retry(agent: Agent, prompt: str):
-    """Invoke agent with one retry on failure."""
+async def _invoke_with_retry(agent_kwargs: dict, prompt: str):
+    """Invoke a fresh agent with one retry on failure."""
     last_exc: Exception | None = None
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            return await agent.invoke_async(prompt)
+            return await Agent(**agent_kwargs).invoke_async(prompt)
         except Exception as exc:
             last_exc = exc
             if attempt < _MAX_RETRIES:

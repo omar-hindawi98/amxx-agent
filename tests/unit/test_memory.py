@@ -1,7 +1,6 @@
 """Unit tests for persistent session memory."""
 
 import sys
-from pathlib import Path
 
 import pytest
 

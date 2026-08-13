@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     model_name: str = "claude-haiku-4-5-20251001"
     model_tokens: int = 512
     model_endpoint: str = ""
+    model_api_key: str = ""
 
     @computed_field
     @property

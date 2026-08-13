@@ -72,45 +72,43 @@ def get(session_id: str) -> list[dict]:
 
 def update(session_id: str, prompt: str, response: str) -> None:
     """Append a user/assistant turn and trim the session to _MAX_MESSAGES rows."""
-    with Session(_engine) as db:
-        with db.begin():
-            max_seq = db.scalar(
-                select(_SessionRow.seq)
-                .where(_SessionRow.session_id == session_id)
-                .order_by(_SessionRow.seq.desc())
-                .limit(1)
-            )
-            next_seq = (max_seq if max_seq is not None else -1) + 1
-            db.add(_SessionRow(
-                session_id=session_id,
-                seq=next_seq,
-                role="user",
-                content=json.dumps([{"type": "text", "text": prompt}]),
-            ))
-            db.add(_SessionRow(
-                session_id=session_id,
-                seq=next_seq + 1,
-                role="assistant",
-                content=json.dumps([{"type": "text", "text": response}]),
-            ))
-            keep_seqs = db.scalars(
-                select(_SessionRow.seq)
-                .where(_SessionRow.session_id == session_id)
-                .order_by(_SessionRow.seq.desc())
-                .limit(_MAX_MESSAGES)
-            ).all()
-            db.execute(
-                delete(_SessionRow)
-                .where(_SessionRow.session_id == session_id)
-                .where(_SessionRow.seq.not_in(keep_seqs))
-            )
+    with Session(_engine) as db, db.begin():
+        max_seq = db.scalar(
+            select(_SessionRow.seq)
+            .where(_SessionRow.session_id == session_id)
+            .order_by(_SessionRow.seq.desc())
+            .limit(1)
+        )
+        next_seq = (max_seq if max_seq is not None else -1) + 1
+        db.add(_SessionRow(
+            session_id=session_id,
+            seq=next_seq,
+            role="user",
+            content=json.dumps([{"type": "text", "text": prompt}]),
+        ))
+        db.add(_SessionRow(
+            session_id=session_id,
+            seq=next_seq + 1,
+            role="assistant",
+            content=json.dumps([{"type": "text", "text": response}]),
+        ))
+        keep_seqs = db.scalars(
+            select(_SessionRow.seq)
+            .where(_SessionRow.session_id == session_id)
+            .order_by(_SessionRow.seq.desc())
+            .limit(_MAX_MESSAGES)
+        ).all()
+        db.execute(
+            delete(_SessionRow)
+            .where(_SessionRow.session_id == session_id)
+            .where(_SessionRow.seq.not_in(keep_seqs))
+        )
 
 
 def clear(session_id: str) -> None:
     """Delete all short-term turns for session_id."""
-    with Session(_engine) as db:
-        with db.begin():
-            db.execute(delete(_SessionRow).where(_SessionRow.session_id == session_id))
+    with Session(_engine) as db, db.begin():
+        db.execute(delete(_SessionRow).where(_SessionRow.session_id == session_id))
 
 
 def get_longterm(session_id: str) -> str:
@@ -122,12 +120,11 @@ def get_longterm(session_id: str) -> str:
 
 def set_longterm(session_id: str, summary: str) -> None:
     """Upsert the long-term summary for session_id."""
-    with Session(_engine) as db:
-        with db.begin():
-            row = db.get(_LongtermRow, session_id)
-            now = datetime.now(UTC).isoformat(timespec="seconds")
-            if row:
-                row.summary = summary
-                row.updated_at = now
-            else:
-                db.add(_LongtermRow(session_id=session_id, summary=summary, updated_at=now))
+    with Session(_engine) as db, db.begin():
+        row = db.get(_LongtermRow, session_id)
+        now = datetime.now(UTC).isoformat(timespec="seconds")
+        if row:
+            row.summary = summary
+            row.updated_at = now
+        else:
+            db.add(_LongtermRow(session_id=session_id, summary=summary, updated_at=now))
