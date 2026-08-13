@@ -12,11 +12,11 @@ from pathlib import Path
 
 from strands import Agent
 
+from amxmodx_genai.config import settings
 from amxmodx_genai.core import memory
 from amxmodx_genai.core.messages import ClearMemoryMsg, QueryMsg
 from amxmodx_genai.core.model import make_model
 from amxmodx_genai.core.protocol import read_json, send_json
-from amxmodx_genai.config import settings
 from amxmodx_genai.core.summarize import summarize_session
 from amxmodx_genai.skills import load_builtin_skills, load_plugin_skills
 from amxmodx_genai.tools import make_plugin_tool, native_tools
