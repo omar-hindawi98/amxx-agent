@@ -13,9 +13,7 @@ def validate() -> None:
     """Raise at startup if required credentials for the configured backend are missing."""
     backend = settings.model_backend
     if backend in _NEEDS_API_KEY and not settings.model_api_key:
-        raise RuntimeError(
-            f"GENAI_MODEL_API_KEY is required when GENAI_MODEL_BACKEND={backend}"
-        )
+        raise RuntimeError(f"GENAI_MODEL_API_KEY is required when GENAI_MODEL_BACKEND={backend}")
 
 
 def get_model():

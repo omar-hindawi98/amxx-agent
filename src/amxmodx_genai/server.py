@@ -14,9 +14,7 @@ _active_tasks: set[asyncio.Task] = set()
 _sem: asyncio.Semaphore | None = None
 
 
-async def _handle_with_tracking(
-    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-) -> None:
+async def _handle_with_tracking(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     assert _sem is not None
     async with _sem:
         task = asyncio.current_task()
@@ -39,9 +37,7 @@ async def serve() -> None:
 
     _sem = asyncio.Semaphore(settings.max_concurrent)
 
-    server = await asyncio.start_server(
-        _handle_with_tracking, settings.host, settings.port
-    )
+    server = await asyncio.start_server(_handle_with_tracking, settings.host, settings.port)
     addrs = ", ".join(str(s.getsockname()) for s in server.sockets)
     log.info("GenAI sidecar listening on %s", addrs)
 
