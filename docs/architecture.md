@@ -30,11 +30,11 @@ graph TD
 
 ## Key design decisions
 
-**One TCP socket per query, kept open.**
-The AMXMODX sockets API is non-blocking and poll-based. Rather than reconnecting for each tool call, the socket stays open for the full agent loop. The poll task (`task_poll_sockets`) reads all complete JSON lines per tick and dispatches them; the slot is freed only when `type=done` arrives.
+**One persistent TCP socket, multiplexed across multiple queries.**
+The AMXMODX sockets API is non-blocking and poll-based. A single socket connection is opened on the first query and remains open indefinitely, multiplexing multiple concurrent queries using `request_id` fields to match requests with responses. The poll task (`task_poll_sockets`) reads all complete JSON lines per tick and dispatches them to the appropriate handler based on `request_id`. Queue slots are freed when `type=done` arrives for that request. When the queue is empty, the poll task stops and is restarted by the next `genai_query` call.
 
 **Two-tier persistent memory.**
-Short-term memory (raw turns, last 20) lives in the `sessions` SQLite table and is cleared when `genai_clear_memory` is called. Long-term memory lives in the `longterm` table as an LLM-generated summary. When short-term memory is cleared, the sidecar summarizes the session and merges it into long-term memory before deleting the raw turns. On the next query, the summary is injected under `## Memory from previous sessions` in the system prompt. Both tables share a single WAL-mode SQLite file (`GENAI_MEMORY_PATH`).
+Short-term memory (raw conversation turns) lives in the `sessions` SQLite table and is cleared when `genai_clear_memory` is called. The number of turns kept is controlled by the `memory_max_messages` environment variable, which counts conversation *turns* (user+assistant pairs), not individual messages. So `memory_max_messages=20` keeps 20 turns (40 DB rows). Long-term memory lives in the `longterm` table as an LLM-generated summary. When short-term memory is cleared, the sidecar summarizes the session and merges it into long-term memory before deleting the raw turns. On the next query, the summary is injected under `## Memory from previous sessions` in the system prompt. Both tables share a single WAL-mode SQLite file (`GENAI_MEMORY_PATH`).
 
 **Skills and tools are namespaced by plugin filename.**
 Both `genai_register_skill` and `genai_register_tool` prefix the registered name with the calling plugin's filename (minus `.amxx`) and a double underscore: `my_plugin__tool_name`. Two plugins can each register `"strategy"` or `"get_map"` with no collision.
@@ -59,6 +59,8 @@ Set `GENAI_BACKEND=ollama` to use a local Ollama model. Configured via environme
 | `plugins/amxmodx_genai/include/constants.inc` | Shared `#define` limits |
 | `plugins/amxmodx_genai/include/json.inc` | Minimal flat-JSON parser |
 | `plugins/amxmodx_genai/include/queue.inc` | Queue and tool/skill registry globals, slot helpers |
+| `plugins/amxmodx_genai/include/core_tools.inc` | Built-in tool definitions (registered by core.sma) |
+| `plugins/amxmodx_genai/include/core_skills.inc` | Built-in skill registration (amxmodx-reference) |
 | `plugins/include/amxmodx_genai.inc` | Public native declarations for third-party plugins |
 | `src/amxmodx_genai/server.py` | `asyncio.start_server` entry point |
 | `src/amxmodx_genai/core/handler.py` | Per-connection logic: reads query, runs agent, manages memory, sends frames |

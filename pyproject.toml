@@ -32,8 +32,6 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-m 'not live'"
-markers = ["live: requires a running sidecar (deselected by default)"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amxmodx_genai"]

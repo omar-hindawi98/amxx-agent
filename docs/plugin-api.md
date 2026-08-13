@@ -25,10 +25,10 @@ public on_response(player, const response[])
 
 Returns the queue slot index on success, or `-1` if the queue is full or the socket failed to open.
 
-`session_id` identifies the conversation memory. When empty (default), it is set to the string representation of `player`. Use a custom string to:
+`session_id` identifies the conversation memory. When empty (default), it is automatically set to the player's SteamID (via `get_user_authid`). For bots and LAN clients without a SteamID, it falls back to `str(player)`. Use a custom string to:
 - Share memory across players: `"ct_team"`, `"t_team"`
 - Create player-independent sessions: `"round_debrief"`, `"server"`
-- Get stable cross-session memory: use the player's Steam auth ID so long-term memory follows them across reconnects
+- Use a different identifier for the same player: `"player_3_context_1"`
 
 ---
 
@@ -182,6 +182,12 @@ public plugin_init()
     genai_register_skill("economy");    // -> my_coach__economy
 }
 ```
+
+**Built-in skills:**
+
+The core plugin optionally registers a built-in `amxmodx-reference` skill (controlled by `genai_core_skills` CVar, default `1`). This skill provides the agent with reference knowledge about AMX Mod X, Pawn scripting, server administration, and common gameplay systems. Plugins can also register their own skills or build on the reference skill.
+
+The `amxmodx-reference` skill is located at `plugins/amxmodx_genai/include/skills/amxmodx-reference/SKILL.md` in the plugin package. To use it, ensure `GENAI_SKILLS_PATH` (environment variable on the sidecar) points to the directory containing `amxmodx-reference/` (i.e., the `include/skills/` directory from the plugin package).
 
 ---
 

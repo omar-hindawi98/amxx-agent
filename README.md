@@ -51,6 +51,8 @@ GENAI_BACKEND=ollama GENAI_OLLAMA_MODEL=llama3.2 uv run genai-sidecar
 |------|---------|-------------|
 | `genai_host` | `127.0.0.1` | Sidecar host |
 | `genai_port` | `27016` | Sidecar port |
+| `genai_core_tools` | `1` | Enable built-in sidecar tools |
+| `genai_core_skills` | `1` | Enable built-in `amxmodx-reference` skill |
 
 ### Environment variables (sidecar)
 
@@ -65,6 +67,7 @@ GENAI_BACKEND=ollama GENAI_OLLAMA_MODEL=llama3.2 uv run genai-sidecar
 | `GENAI_OLLAMA_MODEL` | `llama3.2` | Ollama model name |
 | `GENAI_MEMORY_PATH` | `~/.local/share/amxmodx_genai/memory.db` | SQLite memory file |
 | `GENAI_SKILLS_PATH` | `./skills` | Directory containing skill subdirectories |
+| `memory_max_messages` | `20` | Number of conversation turns to keep in short-term memory (counts turns, not individual messages) |
 
 ## Plugin API
 
@@ -162,10 +165,10 @@ See [docs/plugin-api.md](docs/plugin-api.md) for the full API reference.
 
 The sidecar maintains two tiers of memory per session:
 
-- **Short-term**: raw conversation turns (last 20 messages), cleared on `genai_clear_memory`.
+- **Short-term**: raw conversation turns (last 20 turns, configurable via `memory_max_messages` env var, which counts turns not individual messages), cleared on `genai_clear_memory`.
 - **Long-term**: LLM-generated summary persisted across sessions. Automatically updated when short-term memory is cleared. Injected into the next session's system prompt so the agent remembers past interactions.
 
-Session IDs are arbitrary strings controlled by the plugin. Use a player's auth ID (Steam ID) as the session key to get stable cross-session memory for the same player.
+Session IDs default to the player's SteamID. For bots and LAN clients without a SteamID, they fall back to the client index. Override by passing a custom `session_id` to `genai_query` to share memory across players or create player-independent sessions.
 
 ## Development
 
