@@ -52,19 +52,20 @@ def test_update_accumulates():
     assert len(mem.get("1")) == 4
 
 
-def test_update_caps_at_20_messages():
+def test_update_caps_at_20_turns():
+    # memory_max_messages=20 means 20 conversation turns (40 rows).
     mem = _mem()
-    for i in range(15):
+    for i in range(25):  # 25 turns = 50 rows, exceeds the 40-row cap
         mem.update("1", f"prompt {i}", f"reply {i}")
-    assert len(mem.get("1")) == 20
+    assert len(mem.get("1")) == 40  # 20 turns * 2 rows each
 
 
 def test_update_trims_oldest():
     mem = _mem()
-    for i in range(15):
+    for i in range(25):
         mem.update("1", f"prompt {i}", f"reply {i}")
     result = mem.get("1")
-    assert result[-1]["content"][0]["text"] == "reply 14"
+    assert result[-1]["content"][0]["text"] == "reply 24"
 
 
 def test_clear():
