@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from amxmodx_genai.core.messages import ClearMemoryMsg, QueryMsg, ToolDef
 
-
 # ---------------------------------------------------------------------------
 # ToolDef
 # ---------------------------------------------------------------------------

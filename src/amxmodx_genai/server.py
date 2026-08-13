@@ -5,12 +5,14 @@ import logging
 
 from amxmodx_genai.config import settings
 from amxmodx_genai.core.handler import handle
+from amxmodx_genai.core.model import validate as validate_model
 
 log = logging.getLogger(__name__)
 
 
 async def serve() -> None:
     """Start the GenAI TCP server and listen indefinitely."""
+    validate_model()
     server = await asyncio.start_server(handle, settings.host, settings.port)
     addrs = ", ".join(str(s.getsockname()) for s in server.sockets)
     log.info("GenAI sidecar listening on %s", addrs)

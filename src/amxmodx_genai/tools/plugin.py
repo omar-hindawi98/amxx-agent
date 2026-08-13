@@ -117,7 +117,11 @@ async def _call(
         if not raw:
             _record(session_data, name, args, None, error="plugin closed connection")
             return "(plugin closed connection)"
-        reply = json.loads(raw.decode("utf-8", errors="replace"))
+        try:
+            reply = json.loads(raw.decode("utf-8", errors="replace"))
+        except json.JSONDecodeError:
+            log.warning("malformed frame from plugin during tool call %s, skipping", call_id)
+            continue
         if reply.get("type") == "tool_result" and reply.get("id") == call_id:
             content = reply.get("content", "")
             _record(session_data, name, args, content)
