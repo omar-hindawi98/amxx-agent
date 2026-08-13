@@ -55,9 +55,7 @@ def frame_types(frames: list[dict]) -> list[str]:
 
 async def test_protocol_response_and_done_frames_returned():
     """A query must produce exactly one response frame and one done frame."""
-    frames = await exchange(
-        {"type": "query", "player": 1, "prompt": "say hello", "tools": []}
-    )
+    frames = await exchange({"type": "query", "player": 1, "prompt": "say hello", "tools": []})
     types = frame_types(frames)
     assert "response" in types, f"no response frame: {types}"
     assert "done" in types, f"no done frame: {types}"
@@ -65,9 +63,7 @@ async def test_protocol_response_and_done_frames_returned():
 
 async def test_protocol_response_text_non_empty():
     """The response frame must carry non-empty text."""
-    frames = await exchange(
-        {"type": "query", "player": 1, "prompt": "say hello", "tools": []}
-    )
+    frames = await exchange({"type": "query", "player": 1, "prompt": "say hello", "tools": []})
     response = next(f for f in frames if f["type"] == "response")
     assert response["text"].strip(), "response text was empty"
 
@@ -94,16 +90,13 @@ async def test_memory_persists_within_session():
         }
     )
     response = next(f for f in frames if f["type"] == "response")
-    assert (
-        "AK" in response["text"] or "ak" in response["text"].lower()
-    ), f"expected AK47 in follow-up response, got: {response['text']}"
+    assert "AK" in response["text"] or "ak" in response["text"].lower(), (
+        f"expected AK47 in follow-up response, got: {response['text']}"
+    )
     # cleanup - send clear_memory and close the connection from our side
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write(
-        (
-            json.dumps({"type": "clear_memory", "player": 1, "session_id": session})
-            + "\n"
-        ).encode()
+        (json.dumps({"type": "clear_memory", "player": 1, "session_id": session}) + "\n").encode()
     )
     await writer.drain()
     await asyncio.sleep(1.0)  # give sidecar time to process before we close
