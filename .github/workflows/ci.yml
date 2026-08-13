@@ -68,7 +68,8 @@ jobs:
       - name: Compile plugins
         run: |
           mkdir -p build
-          amxxpc plugins/amxmodx_genai/core.sma -i plugins/amxmodx_genai/include/ -i plugins/include/ -o build/core.amxx
+          amxxpc plugins/amxmodx_genai/core.sma -iplugins/amxmodx_genai/include/ -iplugins/include/ -obuild/core.amxx
+          test -f build/core.amxx || { echo "Compilation failed: build/core.amxx not produced"; exit 1; }
 
       - uses: actions/upload-artifact@v7
         with:
