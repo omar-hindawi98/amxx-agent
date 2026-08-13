@@ -117,9 +117,15 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         final_text = ""
         result_msg = getattr(result, "message", None)
         if result_msg:
-            content = result_msg.get("content", []) if isinstance(result_msg, dict) else getattr(result_msg, "content", [])
+            content = (
+                result_msg.get("content", [])
+                if isinstance(result_msg, dict)
+                else getattr(result_msg, "content", [])
+            )
             for block in content:
-                text = block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+                text = (
+                    block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+                )
                 if text:
                     final_text += text
 

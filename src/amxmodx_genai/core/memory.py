@@ -80,18 +80,22 @@ def update(session_id: str, prompt: str, response: str) -> None:
             .limit(1)
         )
         next_seq = (max_seq if max_seq is not None else -1) + 1
-        db.add(_SessionRow(
-            session_id=session_id,
-            seq=next_seq,
-            role="user",
-            content=json.dumps([{"type": "text", "text": prompt}]),
-        ))
-        db.add(_SessionRow(
-            session_id=session_id,
-            seq=next_seq + 1,
-            role="assistant",
-            content=json.dumps([{"type": "text", "text": response}]),
-        ))
+        db.add(
+            _SessionRow(
+                session_id=session_id,
+                seq=next_seq,
+                role="user",
+                content=json.dumps([{"type": "text", "text": prompt}]),
+            )
+        )
+        db.add(
+            _SessionRow(
+                session_id=session_id,
+                seq=next_seq + 1,
+                role="assistant",
+                content=json.dumps([{"type": "text", "text": response}]),
+            )
+        )
         keep_seqs = db.scalars(
             select(_SessionRow.seq)
             .where(_SessionRow.session_id == session_id)
