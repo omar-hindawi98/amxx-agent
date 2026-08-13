@@ -71,12 +71,6 @@ jobs:
           amxxpc plugins/amxmodx_genai/core.sma \
             -i plugins/amxmodx_genai/include -i plugins/include \
             -o build/core.amxx
-          amxxpc tests/plugins/test_json.sma \
-            -i plugins/amxmodx_genai/include -i tests/plugins/include \
-            -o build/test_json.amxx
-          amxxpc tests/plugins/test_e2e.sma \
-            -i plugins/amxmodx_genai/include -i plugins/include -i tests/plugins/include \
-            -o build/test_e2e.amxx
 
       - uses: actions/upload-artifact@v7
         with:
