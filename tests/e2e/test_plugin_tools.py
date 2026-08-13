@@ -24,7 +24,7 @@ async def test_plugin_tool_registered_in_agent_kwargs(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    async def mock_call(name, args, reader, writer, session_data):
+    async def mock_call(name, args, send, tool_result_queue, request_id, session_data):
         session_data.setdefault("calls", []).append(
             {"tool": name, "args": args, "result": '{"health":100}'}
         )
@@ -72,7 +72,7 @@ async def test_plugin_tool_result_reaches_agent(unused_tcp_port):
     tool_return = '{"name":"Alice","health":80}'
     call_log: list[str] = []
 
-    async def mock_call(name, args, reader, writer, session_data):
+    async def mock_call(name, args, send, tool_result_queue, request_id, session_data):
         call_log.append(name)
         session_data.setdefault("calls", []).append(
             {"tool": name, "args": args, "result": tool_return}
@@ -133,7 +133,7 @@ async def test_plugin_tool_calls_recorded_in_session_data(unused_tcp_port):
     """session_data.calls is populated after tool invocations."""
     captured_session_data: dict = {}
 
-    async def mock_call(name, args, reader, writer, session_data):
+    async def mock_call(name, args, send, tool_result_queue, request_id, session_data):
         session_data.setdefault("calls", []).append({"tool": name, "args": args, "result": "ok"})
         captured_session_data.update(session_data)
         return "ok"

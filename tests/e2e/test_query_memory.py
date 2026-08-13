@@ -147,6 +147,7 @@ async def test_named_session_memory(unused_tcp_port):
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="requires a running local model endpoint")
 async def test_longterm_summary_stored_on_clear(unused_tcp_port):
     mem = _mem()
     mem.update("7", "what gun to buy?", "Buy AK47.")
