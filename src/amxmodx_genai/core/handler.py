@@ -1,3 +1,8 @@
+"""Main request handler for the GenAI server.
+
+Manages agent invocation, memory updates, and skill loading for each request.
+"""
+
 import asyncio
 import contextlib
 import json
@@ -7,9 +12,12 @@ from pathlib import Path
 
 from strands import Agent
 
+from amxmodx_genai.config import settings
 from amxmodx_genai.core import memory
-from amxmodx_genai.core.model import make_model
+from amxmodx_genai.core.messages import ClearMemoryMsg, QueryMsg
+from amxmodx_genai.core.model import get_model
 from amxmodx_genai.core.protocol import read_json, send_json
+from amxmodx_genai.core.summarize import summarize_session
 from amxmodx_genai.skills import load_builtin_skills, load_plugin_skills
 from amxmodx_genai.tools import make_plugin_tool, native_tools
 
@@ -27,6 +35,7 @@ _BUILTIN_SKILLS = load_builtin_skills()
 
 
 async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    """Handle a single client connection, process request, and send response."""
     addr = writer.get_extra_info("peername")
     try:
         msg = await read_json(reader, timeout=10.0)
@@ -34,12 +43,13 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             return
 
         if msg.get("type") == "clear_memory":
-            session_id = msg.get("session_id") or str(msg.get("player", -1))
+            req = ClearMemoryMsg.model_validate(msg)
+            session_id = req.session_id or str(req.player)
             history = await asyncio.to_thread(memory.get, session_id)
             if history:
                 prior = await asyncio.to_thread(memory.get_longterm, session_id)
                 try:
-                    summary = await _summarize_session(history, prior)
+                    summary = await summarize_session(history, prior)
                     if summary:
                         await asyncio.to_thread(memory.set_longterm, session_id, summary)
                         log.info("updated long-term memory for session %s", session_id)
@@ -49,13 +59,13 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             log.info("cleared short-term memory for session %s", session_id)
             return
 
-        player_id = int(msg.get("player", -1))
-        session_id = msg.get("session_id") or str(player_id)
-        prompt = msg.get("prompt", "").strip()
-        plugin_name: str = msg.get("plugin", "")
-        plugin_context: str = (msg.get("system") or "").strip()
-        plugin_tool_defs: list[dict] = msg.get("tools", [])
-        skill_names: list[str] = msg.get("skills", [])
+        req = QueryMsg.model_validate(msg)
+        player_id = req.player
+        session_id = req.session_id or str(player_id)
+        prompt = req.prompt
+        plugin_name = req.plugin
+        plugin_context = req.system
+        skill_names = req.skills
 
         if not prompt:
             send_json(writer, {"type": "response", "text": "(empty prompt)"})
@@ -70,15 +80,15 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         session_data: dict = {}
         plugin_tools = [
             make_plugin_tool(
-                t["name"],
-                t["description"],
+                t.name,
+                t.description,
                 reader,
                 writer,
                 session_data,
-                params=t.get("params") or None,
+                params=t.params or None,
             )
-            for t in plugin_tool_defs
-            if t.get("name") and t.get("description")
+            for t in req.tools
+            if t.name and t.description
         ]
 
         player_history = await memory_task
@@ -95,25 +105,35 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
                 plugins.append(plugin_skills)
 
         agent_kwargs: dict = {
-            "model": make_model(),
+            "model": get_model(),
             "system_prompt": full_system,
-            "tools": plugin_tools + native_tools,
+            "tools": plugin_tools + (native_tools if settings.model_backend != "ollama" else []),
             "messages": player_history,
         }
         if plugins:
             agent_kwargs["plugins"] = plugins
 
-        agent = Agent(**agent_kwargs)
-
-        result = await _invoke_with_retry(agent, prompt)
+        result = await _invoke_with_retry(agent_kwargs, prompt)
 
         final_text = ""
-        if hasattr(result, "message") and result.message:
-            for block in result.message.content:
-                if hasattr(block, "text") and block.text:
-                    final_text += block.text
+        result_msg = getattr(result, "message", None)
+        if result_msg:
+            content = (
+                result_msg.get("content", [])
+                if isinstance(result_msg, dict)
+                else getattr(result_msg, "content", [])
+            )
+            for block in content:
+                text = (
+                    block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+                )
+                if text:
+                    final_text += text
 
         clean_text = final_text.strip().replace("\n", " ").strip()
+        if not clean_text:
+            log.warning("agent returned no text for session=%s", session_id)
+            clean_text = "(no response)"
 
         await asyncio.to_thread(memory.update, session_id, prompt, clean_text)
 
@@ -144,11 +164,12 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             await writer.wait_closed()
 
 
-async def _invoke_with_retry(agent: Agent, prompt: str):
+async def _invoke_with_retry(agent_kwargs: dict, prompt: str):
+    """Invoke a fresh agent with one retry on failure."""
     last_exc: Exception | None = None
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            return await agent.invoke_async(prompt)
+            return await Agent(**agent_kwargs).invoke_async(prompt)
         except Exception as exc:
             last_exc = exc
             if attempt < _MAX_RETRIES:
@@ -158,6 +179,7 @@ async def _invoke_with_retry(agent: Agent, prompt: str):
 
 
 def _build_system_prompt(plugin_name: str, plugin_context: str, longterm: str = "") -> str:
+    """Build the complete system prompt from base, plugin context, and long-term memory."""
     parts = [_BASE_SYSTEM_PROMPT]
     if longterm:
         parts.append(f"\n## Memory from previous sessions\n\n{longterm}")
@@ -165,40 +187,6 @@ def _build_system_prompt(plugin_name: str, plugin_context: str, longterm: str = 
         heading = f"## {plugin_name}" if plugin_name else "## Plugin context"
         parts.append(f"\n{heading}\n\n{_shift_headings(plugin_context)}")
     return "".join(parts)
-
-
-async def _summarize_session(history: list[dict], prior_summary: str) -> str:
-    lines = []
-    for msg in history:
-        role = msg["role"]
-        for block in msg.get("content", []):
-            if isinstance(block, dict) and block.get("text"):
-                lines.append(f"{role}: {block['text']}")
-
-    if not lines:
-        return ""
-
-    conversation = "\n".join(lines)
-    if prior_summary:
-        prompt = (
-            f"Prior summary:\n{prior_summary}\n\n"
-            f"New session:\n{conversation}\n\n"
-            "Merge into one updated summary. 3-5 bullet points, under 200 words."
-        )
-    else:
-        prompt = (
-            f"Conversation:\n{conversation}\n\n"
-            "Summarize key facts, preferences, and outcomes. 3-5 bullet points, under 200 words."
-        )
-
-    agent = Agent(model=make_model(), system_prompt="You are a concise summarizer.")
-    result = await agent.invoke_async(prompt)
-    text = ""
-    if hasattr(result, "message") and result.message:
-        for block in result.message.content:
-            if hasattr(block, "text") and block.text:
-                text += block.text
-    return text.strip()
 
 
 def _shift_headings(text: str) -> str:
@@ -217,6 +205,7 @@ def _shift_headings(text: str) -> str:
 
 
 def _send_error(writer: asyncio.StreamWriter, text: str) -> None:
+    """Send error response and done message to client."""
     with contextlib.suppress(Exception):
         send_json(writer, {"type": "response", "text": text})
         send_json(writer, {"type": "done"})

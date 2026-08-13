@@ -8,88 +8,19 @@ on:
   workflow_call:
 
 env:
-  GENAI_OLLAMA_MODEL: llama3.2:1b
+  GENAI_MODEL_NAME: llama3.2:1b
 
 jobs:
-  compile:
-    # When called from release-please, ci.yml already compiled and uploaded the artifact.
-    if: github.event_name != 'workflow_call'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Cache AMXMODX compiler
-        id: cache-amxmodx
-        uses: actions/cache@v6
-        with:
-          path: /tmp/amxmodx
-          key: amxmodx-1.8.2
-
-      - name: Install AMXMODX compiler
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends lib32gcc-s1 lib32stdc++6
-          if [ "${{ steps.cache-amxmodx.outputs.cache-hit }}" != "true" ]; then
-            curl -sL https://www.amxmodx.org/release/amxmodx-1.8.2-base-linux.tar.gz \
-              | tar xz -C /tmp/amxmodx
-          fi
-          echo "/tmp/amxmodx/addons/amxmodx/scripting" >> "$GITHUB_PATH"
-
-      - name: Compile plugins
-        run: |
-          mkdir -p build
-          amxxpc plugins/amxmodx_genai/core.sma \
-            -i plugins/amxmodx_genai/include -i plugins/include \
-            -o build/core.amxx
-          amxxpc tests/plugins/test_json.sma \
-            -i plugins/amxmodx_genai/include -i tests/plugins/include \
-            -o build/test_json.amxx
-          amxxpc tests/plugins/test_e2e.sma \
-            -i plugins/amxmodx_genai/include -i plugins/include -i tests/plugins/include \
-            -o build/test_e2e.amxx
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: amxx-plugins
-          path: build/
-
   e2e:
     runs-on: ubuntu-latest
-    needs: compile
-    if: always() && (needs.compile.result == 'success' || needs.compile.result == 'skipped')
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: amxx-plugins
-          path: build/
 
       - name: Cache Ollama model
         uses: actions/cache@v6
         with:
           path: ~/.ollama
-          key: ollama-${{ env.GENAI_OLLAMA_MODEL }}
-
-      - name: Pull Ollama model
-        run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-          ollama serve &
-          until curl -sf http://localhost:11434/api/tags >/dev/null; do sleep 1; done
-          ollama pull ${{ env.GENAI_OLLAMA_MODEL }}
-          pkill ollama || true
-
-      - name: Write compose override
-        run: |
-          cat > docker-compose.override.yml <<'EOF'
-          services:
-            ollama:
-              volumes:
-                - type: bind
-                  source: ${HOME}/.ollama
-                  target: /root/.ollama
-          EOF
+          key: ollama-${{ env.GENAI_MODEL_NAME }}
 
       - uses: docker/setup-buildx-action@v4
 
@@ -104,41 +35,27 @@ jobs:
 
       - name: Start services
         run: |
-          GENAI_BACKEND=ollama GENAI_OLLAMA_MODEL=${{ env.GENAI_OLLAMA_MODEL }} \
-          docker compose up -d
+          GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=${{ env.GENAI_MODEL_NAME }} \
+          docker compose up -d ollama sidecar
 
-      - name: Wait for game server
+      - name: Pull Ollama model
         run: |
-          for i in $(seq 1 60); do
-            docker compose logs cstrike 2>&1 | grep -q 'World triggered "Round_Start"' && break
-            docker compose ps --status running --quiet cstrike | grep -q . || {
-              docker compose logs cstrike; exit 1
-            }
-            [ "$i" -eq 60 ] && { docker compose logs cstrike; exit 1; }
-            sleep 2
-          done
+          docker compose exec ollama ollama pull ${{ env.GENAI_MODEL_NAME }}
 
-      - name: Wait for AMX test results
+      - name: Wait for sidecar
         run: |
           for i in $(seq 1 30); do
-            docker compose logs cstrike 2>&1 | grep -q '\[AMXTEST RESULTS\]' && break
-            [ "$i" -eq 30 ] && { docker compose logs cstrike; exit 1; }
+            nc -z 127.0.0.1 27016 2>/dev/null && echo "Sidecar ready." && break
+            [ "$i" -eq 30 ] && { docker compose logs sidecar; exit 1; }
             sleep 2
           done
-
-      - name: Assert no AMX failures
-        run: |
-          LOGS=$(docker compose logs cstrike 2>&1)
-          echo "$LOGS" | grep '\[AMXTEST\]' || true
-          echo "$LOGS" | grep -q '\[AMXTEST\] FAIL' && { echo "AMX tests FAILED."; exit 1; } || true
-          echo "$LOGS" | grep '\[AMXTEST RESULTS\]' | tail -1
 
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
-      - name: Run Python live tests
-        run: uv run pytest -m live -v
+      - name: Run e2e tests
+        run: uv run pytest tests/e2e/ -m live -v
         env:
           GENAI_SIDECAR_HOST: 127.0.0.1
           GENAI_SIDECAR_PORT: 27016

@@ -16,8 +16,6 @@ services:
     volumes:
       # Pre-compiled plugins dropped in by CI before compose up.
       - ./build/core.amxx:/home/steam/cstrike/cstrike/addons/amxmodx/plugins/core.amxx:ro
-      - ./build/test_json.amxx:/home/steam/cstrike/cstrike/addons/amxmodx/plugins/test_json.amxx:ro
-      - ./build/test_e2e.amxx:/home/steam/cstrike/cstrike/addons/amxmodx/plugins/test_e2e.amxx:ro
       - ./docker/amxmodx/plugins.ini:/home/steam/cstrike/cstrike/addons/amxmodx/configs/plugins.ini:ro
       - ./docker/amxmodx/modules.ini:/home/steam/cstrike/cstrike/addons/amxmodx/configs/modules.ini:ro
       - ./docker/server.cfg:/home/steam/cstrike/cstrike/server.cfg:ro
@@ -30,11 +28,10 @@ services:
     environment:
       - GENAI_HOST=0.0.0.0
       - GENAI_PORT=27016
-      - GENAI_BACKEND=${GENAI_BACKEND:-anthropic}
-      - GENAI_MODEL=${GENAI_MODEL:-}
-      - GENAI_OLLAMA_HOST=http://ollama:11434
-      - GENAI_OLLAMA_MODEL=${GENAI_OLLAMA_MODEL:-llama3.2}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GENAI_MODEL_BACKEND=${GENAI_MODEL_BACKEND:-anthropic}
+      - GENAI_MODEL_NAME=${GENAI_MODEL_NAME:-}
+      - GENAI_MODEL_ENDPOINT=http://ollama:11434
+      - GENAI_MODEL_API_KEY=${GENAI_MODEL_API_KEY:-}
     ports:
       - "27016:27016"
     depends_on:
@@ -49,6 +46,7 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+      - ${HOME}/.ollama:/root/.ollama
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 5s

@@ -3,6 +3,7 @@
 #include <constants>
 #include <json>
 #include <queue>
+#include <core_tools>
 
 #define PLUGIN  "GenAI Core"
 #define VERSION "2.0.0" // {x-release-please-version}
@@ -12,6 +13,7 @@
 
 new g_pCvarHost;
 new g_pCvarPort;
+new g_pCvarCoreTools;
 
 // ---- plugin lifecycle -------------------------------------------------------
 
@@ -19,8 +21,9 @@ public plugin_init()
 {
     register_plugin(PLUGIN, VERSION, AUTHOR);
 
-    g_pCvarHost = register_cvar("genai_host", "127.0.0.1");
-    g_pCvarPort = register_cvar("genai_port", "27016");
+    g_pCvarHost       = register_cvar("genai_host",        "127.0.0.1");
+    g_pCvarPort       = register_cvar("genai_port",        "27016");
+    g_pCvarCoreTools  = register_cvar("genai_core_tools",  "1");
 
     g_tSystemPrompts = TrieCreate();
 
@@ -35,6 +38,9 @@ public plugin_init()
     register_native("genai_register_tool",         "native_register_tool");
     register_native("genai_add_tool_param",        "native_add_tool_param");
     register_native("genai_register_skill",        "native_register_skill");
+
+    if (get_pcvar_num(g_pCvarCoreTools))
+        register_core_tools();
 
     for (new i = 0; i < MAX_QUEUE; i++)
         g_iQueueSocket[i] = -1;
@@ -91,7 +97,7 @@ static bool:dispatch_message(i, const line[])
 
         new reply[MAX_RESPONSE * 2 + 64];
         format(reply, sizeof(reply) - 1,
-            "{\"type\":\"tool_result\",\"id\":\"%s\",\"content\":\"%s\"}^n",
+            "{^"type^":^"tool_result^",^"id^":^"%s^",^"content^":^"%s^"}^n",
             escaped_id, escaped_result);
         socket_send_str(g_iQueueSocket[i], reply);
 
@@ -119,7 +125,7 @@ public task_poll_sockets()
         if (!g_bQueueUsed[i])
             continue;
 
-        if (!socket_is_readable(g_iQueueSocket[i], 0))
+        if (!socket_change(g_iQueueSocket[i], 0))
             continue;
 
         new chunk[512];
@@ -221,7 +227,7 @@ public native_query(plugin_id, num_params)
 
         new entry[MAX_TOOL_NAME * 2 + MAX_TOOL_DESC * 2 + MAX_TOOL_PARAMS_JSON + 48];
         format(entry, sizeof(entry) - 1,
-            "%s{\"name\":\"%s\",\"description\":\"%s\",\"params\":%s}",
+            "%s{^"name^":^"%s^",^"description^":^"%s^",^"params^":%s}",
             (t > 0) ? "," : "",
             escaped_name, escaped_desc, g_szToolParamsJson[t]);
         add(tools_json, sizeof(tools_json) - 1, entry);
@@ -234,7 +240,7 @@ public native_query(plugin_id, num_params)
         new escaped_skill[MAX_SKILL_NAME * 2];
         json_escape(g_szSkillName[s], escaped_skill, sizeof(escaped_skill) - 1);
         new entry[MAX_SKILL_NAME * 2 + 8];
-        format(entry, sizeof(entry) - 1, "%s\"%s\"", (s > 0) ? "," : "", escaped_skill);
+        format(entry, sizeof(entry) - 1, "%s^"%s^"", (s > 0) ? "," : "", escaped_skill);
         add(skills_json, sizeof(skills_json) - 1, entry);
     }
     add(skills_json, sizeof(skills_json) - 1, "]");
@@ -257,7 +263,7 @@ public native_query(plugin_id, num_params)
 
     new request[MAX_PROMPT * 2 + MAX_SYSTEM * 2 + MAX_TOOLS * (MAX_TOOL_NAME + MAX_TOOL_DESC + MAX_TOOL_PARAMS_JSON + 48) + MAX_SKILLS * (MAX_SKILL_NAME * 2 + 4) + 256];
     format(request, sizeof(request) - 1,
-        "{\"type\":\"query\",\"player\":%d,\"session_id\":\"%s\",\"prompt\":\"%s\",\"plugin\":\"%s\",\"system\":\"%s\",\"tools\":%s,\"skills\":%s}^n",
+        "{^"type^":^"query^",^"player^":%d,^"session_id^":^"%s^",^"prompt^":^"%s^",^"plugin^":^"%s^",^"system^":^"%s^",^"tools^":%s,^"skills^":%s}^n",
         player, escaped_session, escaped_prompt, escaped_plugin, escaped_system, tools_json, skills_json);
 
     socket_send(sock, request, strlen(request));
@@ -355,7 +361,7 @@ public native_clear_memory(plugin_id, num_params)
 
     new request[MAX_SESSION_ID * 2 + 64];
     format(request, sizeof(request) - 1,
-        "{\"type\":\"clear_memory\",\"player\":%d,\"session_id\":\"%s\"}^n",
+        "{^"type^":^"clear_memory^",^"player^":%d,^"session_id^":^"%s^"}^n",
         player, escaped_session);
     socket_send(sock, request, strlen(request));
     socket_close(sock);
@@ -429,7 +435,7 @@ public native_add_tool_param(plugin_id, num_params)
 
     new entry[400];
     format(entry, sizeof(entry) - 1,
-        "{\"name\":\"%s\",\"type\":\"%s\",\"required\":%s,\"description\":\"%s\"}",
+        "{^"name^":^"%s^",^"type^":^"%s^",^"required^":%s,^"description^":^"%s^"}",
         escaped_name, escaped_type,
         required ? "true" : "false",
         escaped_desc);
@@ -459,3 +465,4 @@ public native_register_skill(plugin_id, num_params)
     format(g_szSkillName[g_iSkillCount], MAX_SKILL_NAME - 1, "%s__%s", prefix, name);
     g_iSkillCount++;
 }
+

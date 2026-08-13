@@ -11,10 +11,10 @@ stock json_escape(const src[], dst[], max_dst)
     new len = strlen(src);
     for (new i = 0; i < len && j < max_dst - 2; i++) {
         new c = src[i];
-        if (c == '"' || c == '\\') {
-            dst[j++] = '\\';
+        if (c == 34 || c == 92) {
+            dst[j++] = 92;
         } else if (c == 10) {
-            dst[j++] = '\\';
+            dst[j++] = 92;
             dst[j++] = 'n';
             continue;
         } else if (c == 13) {
@@ -29,7 +29,7 @@ stock json_escape(const src[], dst[], max_dst)
 stock json_get_string(const json[], const key[], out[], maxlen)
 {
     new pattern[MAX_TOOL_NAME + 4];
-    format(pattern, sizeof(pattern) - 1, "\"%s\":\"", key);
+    format(pattern, sizeof(pattern) - 1, "^"%s^":^"", key);
 
     new pos = strfind(json, pattern);
     if (pos == -1)
@@ -40,14 +40,14 @@ stock json_get_string(const json[], const key[], out[], maxlen)
     new len = strlen(json);
     while (pos < len && j < maxlen - 1) {
         new c = json[pos];
-        if (c == '"')
+        if (c == 34)
             break;
-        if (c == '\\' && pos + 1 < len) {
+        if (c == 92 && pos + 1 < len) {
             pos++;
             c = json[pos];
-            if (c == 'n')                   { out[j++] = 10; pos++; continue; }
-            else if (c == 'r')              { out[j++] = 13; pos++; continue; }
-            else if (c == '"' || c == '\\') { out[j++] = c;  pos++; continue; }
+            if (c == 'n')                  { out[j++] = 10; pos++; continue; }
+            else if (c == 'r')             { out[j++] = 13; pos++; continue; }
+            else if (c == 34 || c == 92)   { out[j++] = c;  pos++; continue; }
         }
         out[j++] = c;
         pos++;
@@ -60,7 +60,7 @@ stock json_get_string(const json[], const key[], out[], maxlen)
 stock json_get_int(const json[], const key[])
 {
     new pattern[MAX_TOOL_NAME + 3];
-    format(pattern, sizeof(pattern) - 1, "\"%s\":", key);
+    format(pattern, sizeof(pattern) - 1, "^"%s^":", key);
 
     new pos = strfind(json, pattern);
     if (pos == -1)
