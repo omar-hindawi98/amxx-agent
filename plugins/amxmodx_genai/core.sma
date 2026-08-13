@@ -4,6 +4,7 @@
 #include <json>
 #include <queue>
 #include <core_tools>
+#include <core_skills>
 
 #define PLUGIN  "GenAI Core"
 #define VERSION "2.0.0" // {x-release-please-version}
@@ -45,7 +46,7 @@ public plugin_init()
         register_core_tools();
 
     if (get_pcvar_num(g_pCvarCoreSkills))
-        genai_register_skill("amxmodx-reference");
+        register_core_skills();
 }
 
 public plugin_end()
