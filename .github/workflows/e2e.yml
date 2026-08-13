@@ -8,7 +8,7 @@ on:
   workflow_call:
 
 env:
-  GENAI_OLLAMA_MODEL: llama3.2:1b
+  GENAI_MODEL_NAME: llama3.2:1b
 
 jobs:
   e2e:
@@ -20,7 +20,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.ollama
-          key: ollama-${{ env.GENAI_OLLAMA_MODEL }}
+          key: ollama-${{ env.GENAI_MODEL_NAME }}
 
       - uses: docker/setup-buildx-action@v4
 
@@ -35,12 +35,12 @@ jobs:
 
       - name: Start services
         run: |
-          GENAI_BACKEND=ollama GENAI_OLLAMA_MODEL=${{ env.GENAI_OLLAMA_MODEL }} \
+          GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=${{ env.GENAI_MODEL_NAME }} \
           docker compose up -d ollama sidecar
 
       - name: Pull Ollama model
         run: |
-          docker compose exec ollama ollama pull ${{ env.GENAI_OLLAMA_MODEL }}
+          docker compose exec ollama ollama pull ${{ env.GENAI_MODEL_NAME }}
 
       - name: Wait for sidecar
         run: |
@@ -54,8 +54,8 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Run Python live tests
-        run: uv run pytest -m live -v
+      - name: Run e2e tests
+        run: uv run pytest tests/e2e/ -m live -v
         env:
           GENAI_SIDECAR_HOST: 127.0.0.1
           GENAI_SIDECAR_PORT: 27016
