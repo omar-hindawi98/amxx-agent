@@ -56,10 +56,14 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends lib32gcc-s1 lib32stdc++6
           if [ "${{ steps.cache-amxmodx.outputs.cache-hit }}" != "true" ]; then
-            curl -sL https://www.amxmodx.org/release/amxmodx-1.8.2-base-linux.tar.gz \
-              | tar xz -C /tmp/amxmodx
+            mkdir -p /tmp/amxmodx
+            curl -sL -o /tmp/amxmodx.tar.gz \
+              https://www.amxmodx.org/release/amxmodx-1.8.2-base-linux.tar.gz
+            tar xzf /tmp/amxmodx.tar.gz -C /tmp/amxmodx
+            rm /tmp/amxmodx.tar.gz
           fi
           echo "/tmp/amxmodx/addons/amxmodx/scripting" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/tmp/amxmodx/addons/amxmodx/scripting${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Compile plugins
         run: |
