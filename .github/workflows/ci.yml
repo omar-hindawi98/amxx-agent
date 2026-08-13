@@ -71,7 +71,7 @@ jobs:
           cp plugins/amxmodx_genai/include/*.inc "$SCRIPTING/include/"
           cp plugins/include/*.inc "$SCRIPTING/include/"
           mkdir -p build
-          OUT=$(amxxpc plugins/amxmodx_genai/core.sma -i "$SCRIPTING/include" 2>&1)
+          OUT=$(amxxpc plugins/amxmodx_genai/core.sma -i"$SCRIPTING/include" 2>&1)
           echo "$OUT"
           echo "$OUT" | grep -q " Error" && { echo "Compilation failed."; exit 1; }
           test -f core.amxx || { echo "Compilation failed: core.amxx not produced"; exit 1; }
