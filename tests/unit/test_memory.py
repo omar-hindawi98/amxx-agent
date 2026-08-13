@@ -1,5 +1,6 @@
 """Unit tests for persistent session memory."""
 
+import asyncio
 import sys
 
 import pytest
@@ -159,3 +160,74 @@ def test_persists_across_reimport(tmp_path):
     result = mem2.get("42")
     assert len(result) == 2
     assert result[0]["content"][0]["text"] == "hello"
+
+
+# ---------------------------------------------------------------------------
+# Concurrency: multiple asyncio tasks updating the same session_id
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_concurrent_updates_same_session_no_data_loss():
+    """N concurrent asyncio tasks writing to the same session all complete without error."""
+    mem = _mem()
+    n = 10
+
+    async def write_turn(i: int) -> None:
+        await asyncio.to_thread(mem.update, "shared", f"prompt {i}", f"reply {i}")
+
+    await asyncio.gather(*[write_turn(i) for i in range(n)])
+
+    rows = mem.get("shared")
+    # Each write adds 2 rows; trim cap is 40 rows (20 turns).
+    # n=10 means 20 rows total which is within cap - all should survive.
+    assert len(rows) == n * 2
+
+
+@pytest.mark.asyncio
+async def test_concurrent_updates_different_sessions_isolated():
+    """Concurrent writes to different sessions don't bleed data across them."""
+    mem = _mem()
+
+    async def write_session(sid: str) -> None:
+        for i in range(3):
+            await asyncio.to_thread(mem.update, sid, f"p{i}", f"r{i}")
+
+    await asyncio.gather(write_session("alpha"), write_session("beta"), write_session("gamma"))
+
+    assert len(mem.get("alpha")) == 6
+    assert len(mem.get("beta")) == 6
+    assert len(mem.get("gamma")) == 6
+    # Verify no cross-contamination
+    for row in mem.get("alpha"):
+        assert row["content"][0]["text"].startswith("p") or row["content"][0]["text"].startswith(
+            "r"
+        )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_read_and_write_same_session():
+    """Reads concurrent with writes never raise; result is internally consistent."""
+    mem = _mem()
+    mem.update("sess", "seed", "seed_reply")
+    errors: list[Exception] = []
+
+    async def writer() -> None:
+        for i in range(5):
+            try:
+                await asyncio.to_thread(mem.update, "sess", f"w{i}", f"wr{i}")
+            except Exception as exc:
+                errors.append(exc)
+
+    async def reader() -> None:
+        for _ in range(10):
+            try:
+                rows = await asyncio.to_thread(mem.get, "sess")
+                # row count must always be even (user+assistant pairs)
+                assert len(rows) % 2 == 0
+            except Exception as exc:
+                errors.append(exc)
+            await asyncio.sleep(0)
+
+    await asyncio.gather(writer(), reader())
+    assert errors == [], f"concurrent read/write raised: {errors}"
