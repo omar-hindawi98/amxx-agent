@@ -32,16 +32,17 @@ async def test_clear_memory(unused_tcp_port):
     mem.update("3", "hello", "world")
     assert mem.get("3") != []
 
-    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-    async with srv:
-        reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
-        writer.write(
-            (json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"}) + "\n").encode()
-        )
-        await writer.drain()
-        await asyncio.wait_for(reader.readline(), timeout=5.0)
-        writer.close()
-        await writer.wait_closed()
+    with patch("amxmodx_genai.core.handler.summarize_session", new=AsyncMock(return_value="")):
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
+            writer.write(
+                (json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"}) + "\n").encode()
+            )
+            await writer.drain()
+            await asyncio.wait_for(reader.readline(), timeout=5.0)
+            writer.close()
+            await writer.wait_closed()
 
     assert mem.get("3") == []
 
@@ -51,14 +52,15 @@ async def test_clear_memory_defaults_to_server_when_no_session_id(unused_tcp_por
     mem = _mem()
     mem.update("server", "hello", "world")
 
-    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-    async with srv:
-        reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
-        writer.write((json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode())
-        await writer.drain()
-        await asyncio.wait_for(reader.readline(), timeout=5.0)
-        writer.close()
-        await writer.wait_closed()
+    with patch("amxmodx_genai.core.handler.summarize_session", new=AsyncMock(return_value="")):
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
+            writer.write((json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode())
+            await writer.drain()
+            await asyncio.wait_for(reader.readline(), timeout=5.0)
+            writer.close()
+            await writer.wait_closed()
 
     assert mem.get("server") == []
 
