@@ -46,6 +46,7 @@ def test_querymsg_defaults():
     assert q.system == ""
     assert q.tools == []
     assert q.skills == []
+    assert q.no_memory is False
 
 
 def test_querymsg_full():

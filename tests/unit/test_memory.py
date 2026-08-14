@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+import time
 
 import pytest
 
@@ -231,3 +232,121 @@ async def test_concurrent_read_and_write_same_session():
 
     await asyncio.gather(writer(), reader())
     assert errors == [], f"concurrent read/write raised: {errors}"
+
+
+# ---------------------------------------------------------------------------
+# session_meta: last_seen updated by memory.update
+# ---------------------------------------------------------------------------
+
+
+def test_update_sets_last_seen():
+    from sqlalchemy.orm import Session
+
+    mem = _mem()
+    before = time.time()
+    mem.update("player1", "hello", "world")
+    after = time.time()
+
+    with Session(mem._engine) as db:
+        row = db.get(mem._SessionMetaRow, "player1")
+    assert row is not None
+    assert before <= row.last_seen <= after
+
+
+def test_update_advances_last_seen():
+    mem = _mem()
+    mem.update("player1", "first", "one")
+    from sqlalchemy.orm import Session
+
+    with Session(mem._engine) as db:
+        ts1 = db.get(mem._SessionMetaRow, "player1").last_seen
+
+    mem.update("player1", "second", "two")
+
+    with Session(mem._engine) as db:
+        ts2 = db.get(mem._SessionMetaRow, "player1").last_seen
+
+    assert ts2 >= ts1
+
+
+# ---------------------------------------------------------------------------
+# vacuum: removes stale sessions, preserves fresh ones
+# ---------------------------------------------------------------------------
+
+
+def test_vacuum_returns_zero_when_no_sessions():
+    assert _mem().vacuum(1) == 0
+
+
+def test_vacuum_removes_stale_sessions():
+    mem = _mem()
+    # Write a session then backdate its last_seen to 10 days ago.
+    mem.update("old_player", "q", "a")
+    from sqlalchemy.orm import Session
+
+    with Session(mem._engine) as db, db.begin():
+        row = db.get(mem._SessionMetaRow, "old_player")
+        row.last_seen = time.time() - 10 * 86400
+
+    removed = mem.vacuum(5)  # 5-day TTL
+
+    assert removed == 1
+    assert mem.get("old_player") == []
+
+
+def test_vacuum_preserves_fresh_sessions():
+    mem = _mem()
+    mem.update("fresh_player", "q", "a")
+
+    removed = mem.vacuum(5)  # session was just written, well within TTL
+
+    assert removed == 0
+    assert mem.get("fresh_player") != []
+
+
+def test_vacuum_removes_longterm_for_stale_session():
+    mem = _mem()
+    mem.update("old_player", "q", "a")
+    mem.set_longterm("old_player", "some summary")
+
+    from sqlalchemy.orm import Session
+
+    with Session(mem._engine) as db, db.begin():
+        row = db.get(mem._SessionMetaRow, "old_player")
+        row.last_seen = time.time() - 10 * 86400
+
+    mem.vacuum(5)
+
+    assert mem.get_longterm("old_player") == ""
+
+
+def test_vacuum_returns_count_of_removed_sessions():
+    mem = _mem()
+    for sid in ("old1", "old2", "old3"):
+        mem.update(sid, "q", "a")
+
+    cutoff = time.time() - 10 * 86400
+    from sqlalchemy.orm import Session
+
+    with Session(mem._engine) as db, db.begin():
+        for sid in ("old1", "old2", "old3"):
+            db.get(mem._SessionMetaRow, sid).last_seen = cutoff
+
+    assert mem.vacuum(5) == 3
+
+
+def test_vacuum_mixed_fresh_and_stale():
+    mem = _mem()
+    mem.update("fresh", "q", "a")
+    mem.update("stale", "q", "a")
+
+    from sqlalchemy.orm import Session
+
+    with Session(mem._engine) as db, db.begin():
+        db.get(mem._SessionMetaRow, "stale").last_seen = time.time() - 10 * 86400
+
+    removed = mem.vacuum(5)
+
+    assert removed == 1
+    assert mem.get("fresh") != []
+    assert mem.get("stale") == []

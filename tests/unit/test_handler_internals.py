@@ -720,6 +720,130 @@ async def test_request_timeout_returns_error(unused_tcp_port):
     assert response["status"] == "error"
 
 
+# ---------------------------------------------------------------------------
+# no_memory: memory is not read or written when flag is set
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_no_memory_query_skips_memory_read(unused_tcp_port):
+    """When no_memory=true, memory.get and memory.get_longterm are never called."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ephemeral reply"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            frames = await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "lookup", "tools": [], "no_memory": True},
+            )
+
+    mock_mem.get.assert_not_called()
+    mock_mem.get_longterm.assert_not_called()
+    assert any(f["type"] == "response" for f in frames)
+
+
+@pytest.mark.asyncio
+async def test_no_memory_query_skips_memory_write(unused_tcp_port):
+    """When no_memory=true, memory.update is never called after the response."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ephemeral reply"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "lookup", "tools": [], "no_memory": True},
+            )
+
+    mock_mem.update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_normal_query_does_write_memory(unused_tcp_port):
+    """Sanity: memory.update IS called for a normal (no_memory=false) query."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("stored reply"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "remember this", "tools": []},
+            )
+
+    mock_mem.update.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# session_id fallback: empty session_id uses "server" not str(player)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_empty_session_id_defaults_to_server(unused_tcp_port):
+    """A query with no session_id uses 'server' as the memory key."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 5, "prompt": "hello", "tools": []},
+                # no session_id field
+            )
+
+    mock_mem.get.assert_called_once_with("server")
+    mock_mem.update.assert_called_once()
+    call_args = mock_mem.update.call_args
+    assert call_args[0][0] == "server"
+
+
 async def _send_single(host: str, port: int, label: str) -> list[dict]:
     """Helper: open connection, send one query, collect frames."""
 

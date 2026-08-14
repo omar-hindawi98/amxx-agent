@@ -46,20 +46,20 @@ async def test_clear_memory(unused_tcp_port):
 
 
 @pytest.mark.asyncio
-async def test_clear_memory_defaults_to_player_string(unused_tcp_port):
+async def test_clear_memory_defaults_to_server_when_no_session_id(unused_tcp_port):
     mem = _mem()
-    mem.update("3", "hello", "world")
+    mem.update("server", "hello", "world")
 
     srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
-        writer.write((json.dumps({"type": "clear_memory", "player": 3}) + "\n").encode())
+        writer.write((json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode())
         await writer.drain()
         await asyncio.sleep(0.5)
         writer.close()
         await writer.wait_closed()
 
-    assert mem.get("3") == []
+    assert mem.get("server") == []
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_memory_updated_after_query(unused_tcp_port):
                 {"type": "query", "player": 5, "prompt": "should I save?", "tools": []},
             )
 
-    h = _mem().get("5")
+    h = _mem().get("server")
     assert len(h) == 2
     assert h[0]["role"] == "user"
     assert h[1]["role"] == "assistant"
