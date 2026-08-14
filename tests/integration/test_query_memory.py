@@ -148,16 +148,14 @@ async def test_named_session_memory(unused_tcp_port):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="requires a running local model endpoint")
 async def test_longterm_summary_stored_on_clear(unused_tcp_port):
     mem = _mem()
     mem.update("7", "what gun to buy?", "Buy AK47.")
 
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(return_value=make_agent_result("- Prefers AK47"))
-        MockAgent.return_value = mock_instance
-
+    with patch(
+        "amxmodx_genai.core.handler.summarize_session",
+        new=AsyncMock(return_value="- Prefers AK47"),
+    ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
@@ -172,7 +170,7 @@ async def test_longterm_summary_stored_on_clear(unused_tcp_port):
             await writer.wait_closed()
 
     assert mem.get("7") == []
-    assert mem.get_longterm("7") != ""
+    assert mem.get_longterm("7") == "- Prefers AK47"
 
 
 @pytest.mark.asyncio
