@@ -1,7 +1,7 @@
-#if defined _amxgenai_tools_moderation_included
+#if defined _amxgenai_tools_mod_incl
     #endinput
 #endif
-#define _amxgenai_tools_moderation_included
+#define _amxgenai_tools_mod_incl
 
 stock register_moderation_tools()
 {

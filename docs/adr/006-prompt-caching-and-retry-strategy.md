@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Each query rebuilds the full system prompt (base instructions + plugin context + long-term memory) and re-sends the entire conversation history to the model. For an Anthropic-backed deployment, the static portions of the system prompt and accumulated history are re-billed as input tokens on every request, making active sessions increasingly expensive.
+Each query rebuilds the full system prompt (base instructions + plugin context + long-term memory) and re-sends the entire conversation history to the model. For LLM backends that bill per input token, the static portions of the system prompt and accumulated history are re-billed on every request, making active sessions increasingly expensive.
 
 Separately, transient LLM API failures (rate limits, service unavailable) need a retry mechanism. The original approach retried the entire agent invocation at the Python level, which re-sends the full context and all tool definitions on each attempt. It also retried unrecoverable failures (`MaxTokensReachedException`, `ContextWindowOverflowException`) where a retry can never succeed.
 
@@ -17,7 +17,7 @@ Separately, transient LLM API failures (rate limits, service unavailable) need a
 `_build_system_prompt` returns `list[SystemContentBlock]` instead of a plain string. The list is split at a cache point:
 
 1. Static block: base system prompt + plugin context (same across all requests from a given plugin).
-2. `cachePoint` marker: tells Anthropic to cache everything before this point.
+2. `cachePoint` marker: tells the LLM backend to cache everything before this point.
 3. Dynamic block (optional): long-term memory summary (changes after each `clear_memory`).
 
 The Strands `Agent` accepts `str | list[SystemContentBlock]` for `system_prompt`. Backends that do not support `cachePoint` (Ollama, OpenAI, LiteLLM) receive the list and ignore the cache-point entry.

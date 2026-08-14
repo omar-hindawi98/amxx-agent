@@ -1,7 +1,7 @@
-#if defined _amxgenai_tools_communication_included
+#if defined _amxgenai_tools_comm_incl
     #endinput
 #endif
-#define _amxgenai_tools_communication_included
+#define _amxgenai_tools_comm_incl
 
 stock register_communication_tools()
 {

@@ -83,7 +83,7 @@ src/amxmodx_genai/
   core/
     handler.py               - Per-connection coroutine: agent loop, memory, framing
     memory.py                - SQLite two-tier memory (short-term turns + long-term summary)
-    model.py                 - Model factory: Anthropic, Bedrock, Ollama, LiteLLM, OpenAI
+    model.py                 - Model factory: multi-backend LLM provider (Bedrock, Ollama, LiteLLM, OpenAI-compatible)
     protocol.py              - JSON framing helpers
     summarize.py             - Long-term memory summarization
     messages.py              - Message type definitions

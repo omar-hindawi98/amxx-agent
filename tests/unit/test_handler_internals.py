@@ -844,6 +844,71 @@ async def test_empty_session_id_defaults_to_server(unused_tcp_port):
     assert call_args[0][0] == "server"
 
 
+# ---------------------------------------------------------------------------
+# _RetryHook: retries on AfterModelCallEvent exceptions, stops on unrecoverable
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_sets_retry_on_transient_error():
+    """_RetryHook sets event.retry=True for a transient exception."""
+    from unittest.mock import MagicMock
+
+    from amxmodx_genai.core.handler import _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = RuntimeError("transient")
+    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+        await hook._maybe_retry(event)
+    assert event.retry is True
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_stops_after_max_retries():
+    """_RetryHook does not set retry after _MAX_HOOK_RETRIES attempts."""
+    from amxmodx_genai.core.handler import _MAX_HOOK_RETRIES, _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = RuntimeError("persistent")
+    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+        for _ in range(_MAX_HOOK_RETRIES):
+            await hook._maybe_retry(event)
+        event.retry = False
+        await hook._maybe_retry(event)
+    assert event.retry is False
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_does_not_retry_unrecoverable():
+    """_RetryHook does not set retry for MaxTokensReachedException."""
+    from strands.types.exceptions import MaxTokensReachedException
+
+    from amxmodx_genai.core.handler import _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = MaxTokensReachedException("too long")
+    event.retry = False
+    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+        await hook._maybe_retry(event)
+    assert event.retry is False
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_no_op_when_no_exception():
+    """_RetryHook does not touch event.retry when exception is None."""
+    from amxmodx_genai.core.handler import _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = None
+    event.retry = False
+    await hook._maybe_retry(event)
+    assert event.retry is False
+
+
 async def _send_single(host: str, port: int, label: str) -> list[dict]:
     """Helper: open connection, send one query, collect frames."""
 

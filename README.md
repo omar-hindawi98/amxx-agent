@@ -8,7 +8,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/ci.yml?branch=main&label=CI)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/ci.yml)
 [![E2E](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/e2e.yml?branch=main&label=E2E)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/e2e.yml)
 
-LLM agent bridge for AMX Mod X game servers. Plugins call simple Pawn natives; a local Python TCP sidecar runs a Strands agent loop against the Anthropic API (or a local Ollama model) with two-tier persistent memory, plugin-registered tools and skills, and a composable system prompt.
+LLM agent bridge for AMX Mod X game servers. Plugins call simple Pawn natives; a local Python TCP sidecar runs a Strands agent loop against a configurable LLM backend with two-tier persistent memory, plugin-registered tools and skills, and a composable system prompt.
 
 ```mermaid
 graph LR
@@ -17,10 +17,10 @@ graph LR
         plugin["your_plugin.amxx"]
     end
     sidecar["amxmodx_genai sidecar"]
-    api["Anthropic API"]
+    llm["LLM"]
 
     core <-->|"TCP protocol v2"| sidecar
-    sidecar -->|HTTPS| api
+    sidecar -->|HTTPS or local| llm
 ```
 
 ## Requirements
@@ -37,7 +37,7 @@ uv sync
 GENAI_MODEL_API_KEY=sk-ant-... uv run genai-sidecar
 ```
 
-Use Ollama instead of the Anthropic API:
+Use Ollama as the local LLM backend:
 
 ```sh
 GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=llama3.2 uv run genai-sidecar
@@ -107,7 +107,7 @@ native genai_append_plugin_context(const content[]);
 // Clear short-term memory for a session (triggers long-term summarization)
 native genai_clear_memory(player, const session_id[] = "");
 
-// Register a tool Claude can call mid-reasoning
+// Register a tool the LLM can call mid-reasoning
 // Tool name is auto-prefixed: "get_map" in "my_plugin.amxx" -> "my_plugin__get_map"
 // callback: public MyTool(player, const args_json[], result[], maxlen)
 native genai_register_tool(const name[], const description[], const callback[]);
