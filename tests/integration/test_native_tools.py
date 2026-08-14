@@ -10,8 +10,13 @@ from tests.integration.helpers import get_handle, make_agent_result, tcp_exchang
 
 
 @pytest.mark.asyncio
-async def test_native_tools_passed_to_agent(unused_tcp_port):
+async def test_native_tools_passed_to_agent(unused_tcp_port, monkeypatch):
     """native_tools list is included in Agent kwargs for non-ollama backends."""
+    monkeypatch.setenv("GENAI_MODEL_BACKEND", "anthropic")
+    for mod in list(sys.modules):
+        if mod.startswith("amxmodx_genai"):
+            del sys.modules[mod]
+
     captured_kwargs: dict = {}
 
     def capture_agent(**kwargs):
@@ -34,8 +39,13 @@ async def test_native_tools_passed_to_agent(unused_tcp_port):
 
 
 @pytest.mark.asyncio
-async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port):
+async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port, monkeypatch):
     """current_datetime tool can be called and returns an ISO 8601 string."""
+    monkeypatch.setenv("GENAI_MODEL_BACKEND", "anthropic")
+    for mod in list(sys.modules):
+        if mod.startswith("amxmodx_genai"):
+            del sys.modules[mod]
+
     call_result: list[str] = []
     captured_tools: list = []
 
@@ -66,8 +76,8 @@ async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port
 
 
 @pytest.mark.asyncio
-async def test_native_tools_included_for_ollama(unused_tcp_port, monkeypatch):
-    """Native tools are included in Agent kwargs even when backend is ollama."""
+async def test_native_tools_omitted_for_ollama(unused_tcp_port, monkeypatch):
+    """Native tools are excluded from Agent kwargs when backend is ollama."""
     monkeypatch.setenv("GENAI_MODEL_BACKEND", "ollama")
     for mod in list(sys.modules):
         if mod.startswith("amxmodx_genai"):
@@ -91,4 +101,4 @@ async def test_native_tools_included_for_ollama(unused_tcp_port, monkeypatch):
             )
 
     tool_names = [t.__name__ for t in captured_kwargs.get("tools", [])]
-    assert "current_datetime" in tool_names
+    assert "current_datetime" not in tool_names

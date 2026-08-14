@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-async def exchange(msg: dict, *, timeout: float = 60.0) -> list[dict]:
+async def exchange(msg: dict, *, timeout: float = 70.0) -> list[dict]:
     """Send a single newline-delimited JSON message and collect all response frames until done."""
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write((json.dumps(msg) + "\n").encode())

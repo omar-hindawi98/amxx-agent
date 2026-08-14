@@ -183,7 +183,7 @@ async def handle(
             "name": "amxmodx-genai",
             "model": get_model(),
             "system_prompt": full_system,
-            "tools": plugin_tools + native_tools,
+            "tools": plugin_tools + (native_tools if settings.model_backend != "ollama" else []),
             "messages": player_history,
             "callback_handler": None,
             "hooks": [_RetryHook()],
