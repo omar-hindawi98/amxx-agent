@@ -69,19 +69,21 @@ async def test_persistent_single_query_returns_frames(unused_tcp_port):
     srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await _open_persistent(unused_tcp_port)
-        await _send_msg(
-            writer,
-            {
-                "type": "query",
-                "request_id": "r1",
-                "player": 1,
-                "prompt": "hello",
-                "tools": [],
-            },
-        )
-        frames = await _read_frames_until_done(reader, "r1")
-        writer.close()
-        await writer.wait_closed()
+        try:
+            await _send_msg(
+                writer,
+                {
+                    "type": "query",
+                    "request_id": "r1",
+                    "player": 1,
+                    "prompt": "hello",
+                    "tools": [],
+                },
+            )
+            frames = await _read_frames_until_done(reader, "r1")
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types
@@ -208,30 +210,31 @@ async def test_persistent_orphan_tool_result_does_not_crash(unused_tcp_port):
     srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await _open_persistent(unused_tcp_port)
+        try:
+            await _send_msg(
+                writer,
+                {
+                    "type": "tool_result",
+                    "request_id": "ghost_request",
+                    "id": "plug_abc123",
+                    "content": "some result",
+                },
+            )
 
-        await _send_msg(
-            writer,
-            {
-                "type": "tool_result",
-                "request_id": "ghost_request",
-                "id": "plug_abc123",
-                "content": "some result",
-            },
-        )
-
-        await _send_msg(
-            writer,
-            {
-                "type": "query",
-                "request_id": "r1",
-                "player": 1,
-                "prompt": "hello",
-                "tools": [],
-            },
-        )
-        frames = await _read_frames_until_done(reader, "r1")
-        writer.close()
-        await writer.wait_closed()
+            await _send_msg(
+                writer,
+                {
+                    "type": "query",
+                    "request_id": "r1",
+                    "player": 1,
+                    "prompt": "hello",
+                    "tools": [],
+                },
+            )
+            frames = await _read_frames_until_done(reader, "r1")
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types
@@ -366,23 +369,24 @@ async def test_persistent_unknown_message_type_ignored(unused_tcp_port):
     srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await _open_persistent(unused_tcp_port)
+        try:
+            await _send_msg(writer, {"type": "unknown_frame_type", "request_id": "x"})
+            await asyncio.sleep(0.05)
 
-        await _send_msg(writer, {"type": "unknown_frame_type", "request_id": "x"})
-        await asyncio.sleep(0.05)
-
-        await _send_msg(
-            writer,
-            {
-                "type": "query",
-                "request_id": "r1",
-                "player": 1,
-                "prompt": "hello",
-                "tools": [],
-            },
-        )
-        frames = await _read_frames_until_done(reader, "r1")
-        writer.close()
-        await writer.wait_closed()
+            await _send_msg(
+                writer,
+                {
+                    "type": "query",
+                    "request_id": "r1",
+                    "player": 1,
+                    "prompt": "hello",
+                    "tools": [],
+                },
+            )
+            frames = await _read_frames_until_done(reader, "r1")
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types
@@ -406,24 +410,25 @@ async def test_persistent_bad_json_skipped_connection_survives(unused_tcp_port):
     srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await _open_persistent(unused_tcp_port)
+        try:
+            writer.write(b"this is not json\n")
+            await writer.drain()
+            await asyncio.sleep(0.05)
 
-        writer.write(b"this is not json\n")
-        await writer.drain()
-        await asyncio.sleep(0.05)
-
-        await _send_msg(
-            writer,
-            {
-                "type": "query",
-                "request_id": "r1",
-                "player": 1,
-                "prompt": "hello",
-                "tools": [],
-            },
-        )
-        frames = await _read_frames_until_done(reader, "r1")
-        writer.close()
-        await writer.wait_closed()
+            await _send_msg(
+                writer,
+                {
+                    "type": "query",
+                    "request_id": "r1",
+                    "player": 1,
+                    "prompt": "hello",
+                    "tools": [],
+                },
+            )
+            frames = await _read_frames_until_done(reader, "r1")
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types

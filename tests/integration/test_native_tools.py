@@ -66,8 +66,8 @@ async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port
 
 
 @pytest.mark.asyncio
-async def test_native_tools_omitted_for_ollama(unused_tcp_port, monkeypatch):
-    """Native tools are excluded from Agent kwargs when backend is ollama."""
+async def test_native_tools_included_for_ollama(unused_tcp_port, monkeypatch):
+    """Native tools are included in Agent kwargs even when backend is ollama."""
     monkeypatch.setenv("GENAI_MODEL_BACKEND", "ollama")
     for mod in list(sys.modules):
         if mod.startswith("amxmodx_genai"):
@@ -91,4 +91,4 @@ async def test_native_tools_omitted_for_ollama(unused_tcp_port, monkeypatch):
             )
 
     tool_names = [t.__name__ for t in captured_kwargs.get("tools", [])]
-    assert "current_datetime" not in tool_names
+    assert "current_datetime" in tool_names
