@@ -7,6 +7,7 @@ _OLLAMA_DEFAULT_ENDPOINT = "http://localhost:11434"
 _NEEDS_API_KEY = frozenset({"anthropic", "openai", "litellm"})
 
 _cached_model = None
+_cached_summary_model = None
 
 
 def validate() -> None:
@@ -24,7 +25,19 @@ def get_model():
     return _cached_model
 
 
-def _build_model():
+def get_summary_model():
+    """Return a cached model for summarization with a higher token ceiling.
+
+    Summarization prompts can be large (full conversation history), so the
+    output budget must be at least 1024 tokens regardless of GENAI_MODEL_TOKENS.
+    """
+    global _cached_summary_model
+    if _cached_summary_model is None:
+        _cached_summary_model = _build_model(max_tokens=max(settings.model_tokens, 1024))
+    return _cached_summary_model
+
+
+def _build_model(max_tokens: int | None = None):
     """Construct a new Strands model for the configured backend.
 
     Supported backends (GENAI_MODEL_BACKEND):
@@ -36,7 +49,8 @@ def _build_model():
     """
     backend = settings.model_backend
     model_id = settings.model_name
-    max_tokens = settings.model_tokens
+    if max_tokens is None:
+        max_tokens = settings.model_tokens
     endpoint = settings.model_endpoint
     api_key = settings.model_api_key
 

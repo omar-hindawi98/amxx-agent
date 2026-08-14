@@ -3,7 +3,7 @@
 Add more @tool functions here to make them available to every agent automatically.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from strands import tool
 
@@ -12,7 +12,7 @@ from strands import tool
 def current_datetime() -> str:
     """Returns the current date and time in ISO 8601 format. Use when you need to know
     what time or date it is right now."""
-    return datetime.now().isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def get_all() -> list:

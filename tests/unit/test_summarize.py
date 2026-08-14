@@ -46,7 +46,7 @@ async def test_history_with_no_text_blocks_returns_empty_string():
 
 
 _AGENT_PATH = "amxmodx_genai.core.summarize.Agent"
-_MODEL_PATH = "amxmodx_genai.core.summarize.get_model"
+_MODEL_PATH = "amxmodx_genai.core.summarize.get_summary_model"
 
 
 @pytest.mark.asyncio

@@ -84,6 +84,10 @@ async def _handle_persistent(
 
             else:
                 log.warning("unknown message type %r from %s", msg_type, addr)
+                await send(
+                    {"type": "response", "text": "(unknown request type)", "request_id": request_id}
+                )
+                await send({"type": "done", "request_id": request_id})
 
     finally:
         log.info("plugin disconnected from %s, cancelling %d in-flight tasks", addr, len(in_flight))
@@ -103,7 +107,7 @@ async def handle_once(
     """Handle exactly one request on a connection then close - for testing."""
     global _sem
     if _sem is None:
-        _sem = asyncio.Semaphore(8)
+        _sem = asyncio.Semaphore(settings.max_concurrent)
 
     write_lock = asyncio.Lock()
 
@@ -187,7 +191,7 @@ async def serve() -> None:
         await stop_event.wait()
         server.close()
         await server.wait_closed()
-        log.info("server closed, cancelling %d active handlers", len(_active_tasks))
+        log.info("server closed, cancelling %d active connections", len(_active_tasks))
         for t in list(_active_tasks):
             t.cancel()
         if _active_tasks:
@@ -197,5 +201,7 @@ async def serve() -> None:
 
 def serve_cli() -> None:
     """Configure logging and run the server from CLI."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    from amxmodx_genai.logger import setup as setup_logging
+
+    setup_logging()
     asyncio.run(serve())

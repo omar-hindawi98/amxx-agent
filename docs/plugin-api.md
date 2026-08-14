@@ -1,6 +1,6 @@
 # Plugin API
 
-This guide covers writing an AMXMODX plugin that uses amxmodx_genai.
+This guide covers writing an AMX Mod X plugin that uses amxmodx_genai.
 
 ## Setup
 
@@ -152,7 +152,7 @@ Registers a skill directory the agent can use for all queries from the calling p
 
 The skill name is automatically prefixed with the plugin filename (minus `.amxx`) using a double underscore separator. A skill named `"strategy"` in `my_coach.amxx` is registered as `"my_coach__strategy"`. This prevents collisions between plugins.
 
-The sidecar resolves skills by looking for `<name>/SKILL.md` under `GENAI_SKILLS_PATH` (defaults to `./skills/` next to the sidecar, overridden with the `GENAI_SKILLS_PATH` env var). Deploy the skill directory to that location on the sidecar machine.
+The sidecar resolves skills by looking for `<name>/SKILL.md` under `GENAI_SKILLS_PATH` (defaults to `~/.local/share/amxmodx_genai/skills`, overridden with the `GENAI_SKILLS_PATH` env var). Deploy the skill directory to that location on the sidecar machine.
 
 **Skill directory structure** (`skills/my_coach__strategy/`):
 

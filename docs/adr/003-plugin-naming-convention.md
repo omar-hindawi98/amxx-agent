@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Multiple AMXMODX plugins can be loaded simultaneously. Each plugin registers its own tools and skills. Without namespacing, two plugins registering a tool named `"get_map"` or a skill named `"strategy"` would collide.
+Multiple AMX Mod X plugins can be loaded simultaneously. Each plugin registers its own tools and skills. Without namespacing, two plugins registering a tool named `"get_map"` or a skill named `"strategy"` would collide.
 
 A global registry with collision detection would fail on duplicate names and force plugin authors to manually choose unique names - error-prone and adds coordination burden across unrelated plugins. Plugin-author-supplied prefixes are flexible but inconsistent.
 

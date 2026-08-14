@@ -2,7 +2,7 @@
 
 from strands import Agent
 
-from amxmodx_genai.core.model import get_model
+from amxmodx_genai.core.model import get_summary_model
 
 
 async def summarize_session(history: list[dict], prior_summary: str) -> str:
@@ -33,7 +33,9 @@ async def summarize_session(history: list[dict], prior_summary: str) -> str:
             "Summarize key facts, preferences, and outcomes. 3-5 bullet points, under 200 words."
         )
 
-    agent = Agent(model=get_model(), system_prompt="You are a concise summarizer.")
+    agent = Agent(
+        model=get_summary_model(), system_prompt="You are a concise summarizer.", tools=[]
+    )
     result = await agent.invoke_async(prompt)
     text = ""
     result_msg = getattr(result, "message", None)
