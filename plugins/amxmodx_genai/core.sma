@@ -7,7 +7,7 @@
 #include <core_skills>
 
 #define PLUGIN  "GenAI Core"
-#define VERSION "2.0.0" // {x-release-please-version}
+#define VERSION "1.1.0" // {x-release-please-version}
 #define AUTHOR  "omar-hindawi98"
 
 // ---- cvars ------------------------------------------------------------------
