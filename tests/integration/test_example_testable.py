@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.integration.conftest import requires_ollama
 from tests.integration.helpers import make_agent_result
 
 _SESSION = "testable__plugin"
@@ -150,7 +151,7 @@ async def _send_control(port: int, frame: dict) -> None:
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write((json.dumps(frame) + "\n").encode())
     await writer.drain()
-    await asyncio.wait_for(reader.readline(), timeout=5.0)
+    await asyncio.wait_for(reader.readline(), timeout=70.0)
     writer.close()
     await writer.wait_closed()
 
@@ -388,6 +389,7 @@ async def test_memory_persists_within_session(unused_tcp_port):
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_clear_memory_resets_session(unused_tcp_port):
     """After clear_memory the session history is empty."""
@@ -398,10 +400,7 @@ async def test_clear_memory_resets_session(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
         return inst
 
-    with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.summarize.Agent", side_effect=make_agent),
-    ):
+    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(unused_tcp_port, "remember this", "r1", {})
