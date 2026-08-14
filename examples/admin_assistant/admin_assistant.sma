@@ -119,17 +119,28 @@ public cmd_ai_reset(player)
 }
 
 // Wipe both short-term AND long-term memory for the target player.
-// Usage: amx_ai_fullreset <#id|name>
+// Usage: amx_ai_fullreset <#userid|name>
 public cmd_ai_fullreset(player, level, cid)
 {
-    if (!cmd_access(player, level, cid, 2))
+    if (!(get_user_flags(player) & REQUIRED_ACCESS)) {
+        console_print(player, "[AI] Access denied.");
         return PLUGIN_HANDLED;
+    }
 
     new arg[32];
     read_argv(1, arg, sizeof(arg) - 1);
-    new target = cmd_target(player, arg, CMDTARGET_ALLOW_SELF);
-    if (!target)
+    if (!arg[0]) {
+        console_print(player, "[AI] Usage: amx_ai_fullreset <#userid|name>");
         return PLUGIN_HANDLED;
+    }
+
+    new target = find_player("n", arg);
+    if (!target)
+        target = find_player("c", arg);
+    if (!target) {
+        console_print(player, "[AI] Player not found: %s", arg);
+        return PLUGIN_HANDLED;
+    }
 
     // genai_clear_memory triggers summarization then deletes short-term turns.
     // genai_clear_longterm_memory then discards the resulting summary.
@@ -138,7 +149,7 @@ public cmd_ai_fullreset(player, level, cid)
 
     new name[32];
     get_user_name(target, name, sizeof(name) - 1);
-    client_print(player, print_console, "[AI] Full memory reset done for %s.", name);
+    console_print(player, "[AI] Full memory reset done for %s.", name);
     return PLUGIN_HANDLED;
 }
 
