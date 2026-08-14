@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     request_timeout_seconds: int = 60
     # When non-empty, every query/clear_memory message must include a matching auth_token field.
     auth_token: str = ""
-    model_backend: str = "anthropic"
-    model_name: str = "claude-haiku-4-5-20251001"
+    model_backend: str = "ollama"
+    model_name: str = "llama3.2:1b"
     model_tokens: int = 2048
     model_endpoint: str = ""
     model_api_key: str = ""
