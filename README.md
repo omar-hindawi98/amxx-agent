@@ -1,7 +1,5 @@
 <div align="center">
-
-# AMX Mod X GenAI
-
+    
 <img src="docs/assets/logo.png" alt="AMX Mod X GenAI" width="200">
 
 [![Release](https://img.shields.io/github/v/release/omar-hindawi98/amxmodx-genai)](https://github.com/omar-hindawi98/amxmodx-genai/releases)
