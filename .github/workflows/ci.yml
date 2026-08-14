@@ -72,14 +72,35 @@ jobs:
           mkdir -p "$SCRIPTING/include/tools"
           cp plugins/amxmodx_genai/include/tools/*.inc "$SCRIPTING/include/tools/"
           cp plugins/include/*.inc "$SCRIPTING/include/"
-          mkdir -p build
+          mkdir -p build build/examples
+
+          # Core plugin
           OUT=$(amxxpc plugins/amxmodx_genai/core.sma -i"$SCRIPTING/include" 2>&1)
           echo "$OUT"
-          echo "$OUT" | grep -q " Error" && { echo "Compilation failed."; exit 1; }
-          test -f core.amxx || { echo "Compilation failed: core.amxx not produced"; exit 1; }
+          echo "$OUT" | grep -q " Error" && { echo "core.sma compilation failed."; exit 1; }
+          test -f core.amxx || { echo "core.amxx not produced"; exit 1; }
           mv core.amxx build/core.amxx
+
+          # Example plugins (compile-check only; .amxx output goes to build/examples/)
+          FAILED=0
+          for SMA in examples/*//*.sma; do
+            NAME=$(basename "$SMA" .sma)
+            echo "--- Compiling $SMA ---"
+            OUT=$(amxxpc "$SMA" -i"$SCRIPTING/include" 2>&1)
+            echo "$OUT"
+            if echo "$OUT" | grep -q " Error"; then
+              echo "FAILED: $SMA"
+              FAILED=1
+            else
+              AMXX="${NAME}.amxx"
+              test -f "$AMXX" && mv "$AMXX" "build/examples/$AMXX"
+            fi
+          done
+          test "$FAILED" -eq 0 || { echo "One or more example plugins failed to compile."; exit 1; }
 
       - uses: actions/upload-artifact@v7
         with:
           name: amxx-plugins
           path: build/
+          # build/core.amxx is the release artifact.
+          # build/examples/*.amxx are compile-check artifacts only; not released.
