@@ -398,7 +398,10 @@ async def test_clear_memory_resets_session(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.summarize.Agent", side_effect=make_agent),
+    ):
         srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(unused_tcp_port, "remember this", "r1", {})
