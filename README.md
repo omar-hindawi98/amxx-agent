@@ -1,6 +1,6 @@
 # AMX Mod X GenAI
 
-![AMX Mod X GenAI](docs/assets/logo.png)
+<img src="docs/assets/logo.png" alt="AMX Mod X GenAI" width="200">
 
 [![Release](https://img.shields.io/github/v/release/omar-hindawi98/amxmodx-genai)](https://github.com/omar-hindawi98/amxmodx-genai/releases)
 [![AMX Mod X](https://img.shields.io/badge/AMX%20Mod%20X-1.8.2%2B-orange)](https://www.amxmodx.org/)
