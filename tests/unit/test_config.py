@@ -10,8 +10,8 @@ def test_defaults():
     assert s.max_concurrent == 32
     assert s.request_timeout_seconds == 60
     assert s.auth_token == ""
-    assert s.model_backend == "anthropic"
-    assert s.model_name == "claude-haiku-4-5-20251001"
+    assert s.model_backend == "ollama"
+    assert s.model_name == "llama3.2:1b"
     assert s.model_tokens == 2048
     assert s.model_endpoint == ""
     assert s.model_api_key == ""
