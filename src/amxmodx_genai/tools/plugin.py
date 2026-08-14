@@ -15,6 +15,9 @@ log = logging.getLogger(__name__)
 # Whitelist of JSON Schema types accepted from Pawn. Unknown types fall back to "string".
 _VALID_TYPES: frozenset[str] = frozenset({"string", "integer", "boolean", "number"})
 
+# Cap plugin tool results to prevent accidental huge payloads being forwarded to the model.
+_MAX_TOOL_RESULT_BYTES = 8192
+
 
 class _ToolParam(BaseModel):
     """A single typed parameter in a plugin tool definition."""
@@ -124,6 +127,14 @@ async def _call(
             return "(tool call timed out)"
         if reply.get("id") == call_id:
             content = reply.get("content", "")
+            if isinstance(content, str) and len(content) > _MAX_TOOL_RESULT_BYTES:
+                log.warning(
+                    "tool result from %s truncated (%d -> %d bytes)",
+                    name,
+                    len(content),
+                    _MAX_TOOL_RESULT_BYTES,
+                )
+                content = content[:_MAX_TOOL_RESULT_BYTES]
             _record(session_data, name, args, content)
             return content
         # Unexpected id (shouldn't happen; tool calls within one request are sequential).

@@ -498,6 +498,162 @@ async def test_semaphore_queues_requests_when_saturated(unused_tcp_port):
     assert completion_order == [1, 2], f"unexpected order: {completion_order}"
 
 
+# ---------------------------------------------------------------------------
+# Auth: unauthorized requests are rejected before reaching the agent
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_auth_token_rejected_when_missing(unused_tcp_port):
+    """When auth_token is configured, a request without it gets (unauthorized)."""
+    import os
+
+    os.environ["GENAI_AUTH_TOKEN"] = "secret123"
+    try:
+        from tests.integration.helpers import get_handle, tcp_exchange
+
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            frames = await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "hello", "tools": []},
+            )
+    finally:
+        del os.environ["GENAI_AUTH_TOKEN"]
+
+    response = next(f for f in frames if f["type"] == "response")
+    assert "unauthorized" in response["text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_auth_token_accepted_when_correct(unused_tcp_port):
+    """When auth_token is configured and provided correctly, the request proceeds."""
+    import os
+
+    os.environ["GENAI_AUTH_TOKEN"] = "secret123"
+    try:
+
+        def make_agent(**kwargs):
+            inst = MagicMock()
+            inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
+            return inst
+
+        with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+            from tests.integration.helpers import get_handle, tcp_exchange
+
+            srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+            async with srv:
+                frames = await tcp_exchange(
+                    "127.0.0.1",
+                    unused_tcp_port,
+                    {
+                        "type": "query",
+                        "player": 1,
+                        "prompt": "hello",
+                        "tools": [],
+                        "auth_token": "secret123",
+                    },
+                )
+    finally:
+        del os.environ["GENAI_AUTH_TOKEN"]
+
+    response = next(f for f in frames if f["type"] == "response")
+    assert response["text"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_auth_disabled_when_token_empty(unused_tcp_port):
+    """When auth_token is empty (default), requests without a token are accepted."""
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("allowed"))
+        return inst
+
+    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+        from tests.integration.helpers import get_handle, tcp_exchange
+
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            frames = await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "hello", "tools": []},
+            )
+
+    response = next(f for f in frames if f["type"] == "response")
+    assert response["text"] == "allowed"
+
+
+# ---------------------------------------------------------------------------
+# Unknown message type: server sends error response instead of hanging client
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_unknown_message_type_gets_error_response(unused_tcp_port):
+    """An unknown message type receives a response+done frame so the client doesn't hang."""
+    from amxmodx_genai.server import _handle_persistent
+    from tests.integration.helpers import tcp_exchange
+
+    srv = await asyncio.start_server(_handle_persistent, "127.0.0.1", unused_tcp_port)
+    async with srv:
+        frames = await tcp_exchange(
+            "127.0.0.1",
+            unused_tcp_port,
+            {"type": "bogus_type", "request_id": "req-x"},
+        )
+
+    assert any(f["type"] == "response" for f in frames)
+    assert any(f["type"] == "done" for f in frames)
+
+
+# ---------------------------------------------------------------------------
+# Request timeout: wait_for enforces GENAI_REQUEST_TIMEOUT_SECONDS
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_request_timeout_returns_error(unused_tcp_port):
+    """When the agent hangs past request_timeout_seconds, the client gets a timeout error."""
+    import os
+
+    os.environ["GENAI_REQUEST_TIMEOUT_SECONDS"] = "0"  # disabled = no timeout
+    # Use a very short timeout instead via monkeypatching wait_for
+    os.environ["GENAI_REQUEST_TIMEOUT_SECONDS"] = "1"
+    try:
+        hang_started = asyncio.Event()
+
+        async def hanging_invoke(prompt):
+            hang_started.set()
+            await asyncio.sleep(60)
+
+        def make_agent(**kwargs):
+            inst = MagicMock()
+            inst.invoke_async = AsyncMock(side_effect=hanging_invoke)
+            return inst
+
+        with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+            from tests.integration.helpers import get_handle, tcp_exchange
+
+            srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+            async with srv:
+                frames = await asyncio.wait_for(
+                    tcp_exchange(
+                        "127.0.0.1",
+                        unused_tcp_port,
+                        {"type": "query", "player": 1, "prompt": "hang", "tools": []},
+                    ),
+                    timeout=5.0,
+                )
+    finally:
+        del os.environ["GENAI_REQUEST_TIMEOUT_SECONDS"]
+
+    response = next(f for f in frames if f["type"] == "response")
+    assert "timed out" in response["text"].lower()
+
+
 async def _send_single(host: str, port: int, label: str) -> list[dict]:
     """Helper: open connection, send one query, collect frames."""
 

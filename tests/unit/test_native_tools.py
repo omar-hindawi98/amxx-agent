@@ -1,6 +1,6 @@
 """Unit tests for tools/native.py."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from amxmodx_genai.tools.native import current_datetime, get_all
 
@@ -13,11 +13,17 @@ def test_current_datetime_is_iso8601():
 
 
 def test_current_datetime_is_recent():
-    before = datetime.now().replace(microsecond=0)
+    before = datetime.now(UTC).replace(microsecond=0)
     result = current_datetime()
-    after = datetime.now()
+    after = datetime.now(UTC)
     parsed = datetime.fromisoformat(result)
     assert before <= parsed <= after
+
+
+def test_current_datetime_is_timezone_aware():
+    result = current_datetime()
+    parsed = datetime.fromisoformat(result)
+    assert parsed.tzinfo is not None
 
 
 def test_get_all_contains_current_datetime():

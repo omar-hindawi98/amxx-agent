@@ -8,7 +8,7 @@ Multiple queries are multiplexed over one persistent TCP connection, identified 
 
 ```mermaid
 sequenceDiagram
-    participant AMX as AMXMODX
+    participant AMX as AMX Mod X
     participant SC as sidecar
     participant LLM
 
@@ -36,7 +36,7 @@ Each message includes a `request_id` to correlate requests with their responses.
 
 ## Message types
 
-### query (AMXMODX -> sidecar)
+### query (AMX Mod X -> sidecar)
 
 ```json
 {
@@ -47,6 +47,7 @@ Each message includes a `request_id` to correlate requests with their responses.
   "plugin": "my_plugin",
   "prompt": "what should we do this round?",
   "system": "You are a team assistant. Keep answers brief.",
+  "auth_token": "mysecret",
   "tools": [
     {
       "name": "my_plugin__get_score",
@@ -61,15 +62,16 @@ Each message includes a `request_id` to correlate requests with their responses.
 | Field | Type | Description |
 |-------|------|-------------|
 | `request_id` | string | Unique request identifier for multiplexing responses to requests over the persistent connection |
-| `player` | int | AMXMODX client index used for callback routing (0 = server context) |
-| `session_id` | string | Memory key. Defaults to player's SteamID (via `get_user_authid`) when absent or empty. Falls back to `str(player)` for bots and LAN clients without a SteamID. |
+| `player` | int | AMX Mod X client index used for callback routing (0 = server context) |
+| `session_id` | string | Memory key. Defaults to player's SteamID (via `get_user_authid`) when absent or empty. Falls back to `str(player)` for bots and LAN clients without a SteamID. Max 256 characters. |
 | `plugin` | string | Plugin filename (minus `.amxx`), used to name the system prompt section |
-| `prompt` | string | User message |
-| `system` | string | Per-plugin context text (appended under `## <plugin>` in the system prompt) |
+| `prompt` | string | User message. Max 8192 characters. |
+| `system` | string | Per-plugin context text (appended under `## <plugin>` in the system prompt). Max 32768 characters. |
+| `auth_token` | string | Required when `GENAI_AUTH_TOKEN` is set on the sidecar. Must match exactly or the request is rejected with `(unauthorized)`. Omit when auth is disabled (default). |
 | `tools` | array | Plugin-registered tool definitions visible to the LLM |
 | `skills` | array | Skill directory names to load for this query |
 
-### tool_call (sidecar -> AMXMODX)
+### tool_call (sidecar -> AMX Mod X)
 
 ```json
 {"type": "tool_call", "request_id": "req1", "id": "toolu_01abc", "name": "my_plugin__get_score", "args": "{\"team\":\"ct\"}"}
@@ -77,7 +79,7 @@ Each message includes a `request_id` to correlate requests with their responses.
 
 `request_id` identifies which query this tool call belongs to. `args` is a JSON object serialised as a string. Use `json_get_string` / `json_get_int` from `json.inc` to parse it in the tool callback.
 
-### tool_result (AMXMODX -> sidecar)
+### tool_result (AMX Mod X -> sidecar)
 
 ```json
 {"type": "tool_result", "request_id": "req1", "id": "toolu_01abc", "content": "CT 5 - T 3"}
@@ -85,7 +87,7 @@ Each message includes a `request_id` to correlate requests with their responses.
 
 `request_id` identifies which query this result belongs to. `id` must match the `tool_call` that triggered this result.
 
-### response (sidecar -> AMXMODX)
+### response (sidecar -> AMX Mod X)
 
 ```json
 {"type": "response", "request_id": "req1", "text": "Rush B this round - CTs are rotating slow."}
@@ -93,23 +95,25 @@ Each message includes a `request_id` to correlate requests with their responses.
 
 The final conversational text from the agent. `request_id` identifies which query this response belongs to.
 
-### done (sidecar -> AMXMODX)
+### done (sidecar -> AMX Mod X)
 
 ```json
 {"type": "done", "request_id": "req1"}
 ```
 
-Signals end of the agent turn for the given `request_id`. The AMXMODX queue slot is freed. The persistent connection remains open for future queries.
+Signals end of the agent turn for the given `request_id`. The AMX Mod X queue slot is freed. The persistent connection remains open for future queries.
 
 ---
 
-### clear_memory (AMXMODX -> sidecar)
+### clear_memory (AMX Mod X -> sidecar)
 
 ```json
-{"type": "clear_memory", "request_id": "clear1", "player": 3, "session_id": "STEAM_0:1:12345"}
+{"type": "clear_memory", "request_id": "clear1", "player": 3, "session_id": "STEAM_0:1:12345", "auth_token": "mysecret"}
 ```
 
-Clears short-term memory for the given `session_id` (falls back to player's SteamID or `str(player)` when absent). Before deleting the conversation turns, the sidecar summarizes the session and merges it into long-term memory. The sidecar does not send a reply. `request_id` is included for consistency with the multiplexed protocol.
+Clears short-term memory for the given `session_id` (falls back to player's SteamID or `str(player)` when absent). Before deleting the conversation turns, the sidecar summarizes the session and merges it into long-term memory. On success the sidecar sends no reply. `request_id` is included for consistency with the multiplexed protocol.
+
+`auth_token` follows the same rules as on `query`: required when `GENAI_AUTH_TOKEN` is configured, rejected with a `response` + `done` frame otherwise.
 
 ## Encoding
 

@@ -25,14 +25,22 @@ from amxmodx_genai.tools import make_plugin_tool, native_tools
 log = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT_PATH = Path(__file__).parent.parent / "SYSTEM_PROMPT.md"
-_BASE_SYSTEM_PROMPT = (
-    _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8") if _SYSTEM_PROMPT_PATH.exists() else ""
-)
+try:
+    _BASE_SYSTEM_PROMPT = (
+        _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8") if _SYSTEM_PROMPT_PATH.exists() else ""
+    )
+except OSError as _exc:
+    log.warning("could not read system prompt from %s: %s", _SYSTEM_PROMPT_PATH, _exc)
+    _BASE_SYSTEM_PROMPT = ""
 
 _MAX_RETRIES = 1
 
-# Loaded once at import time; None when no built-in skills exist.
-_BUILTIN_SKILLS = load_builtin_skills()
+# Loaded once at import time; None when no built-in skills exist or loading fails.
+try:
+    _BUILTIN_SKILLS = load_builtin_skills()
+except Exception as _exc:
+    log.warning("failed to load built-in skills: %s", _exc)
+    _BUILTIN_SKILLS = None
 
 # Type alias for the send callable passed in by the server.
 _Send = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
@@ -53,6 +61,11 @@ async def handle(
 
     async def _send(obj: dict[str, Any]) -> None:
         await send({**obj, "request_id": request_id})
+
+    if settings.auth_token and msg.get("auth_token") != settings.auth_token:
+        log.warning("unauthorized request (request_id=%s)", request_id)
+        await _safe_send_error(_send, "(unauthorized)")
+        return
 
     try:
         if msg.get("type") == "clear_memory":
@@ -113,9 +126,12 @@ async def handle(
         if _BUILTIN_SKILLS:
             plugins.append(_BUILTIN_SKILLS)
         if skill_names:
-            plugin_skills = load_plugin_skills(skill_names)
-            if plugin_skills:
-                plugins.append(plugin_skills)
+            try:
+                plugin_skills = load_plugin_skills(skill_names)
+                if plugin_skills:
+                    plugins.append(plugin_skills)
+            except Exception as exc:
+                log.warning("failed to load plugin skills %s: %s", skill_names, exc)
 
         agent_kwargs: dict = {
             "model": get_model(),
@@ -126,7 +142,8 @@ async def handle(
         if plugins:
             agent_kwargs["plugins"] = plugins
 
-        result = await _invoke_with_retry(agent_kwargs, prompt)
+        timeout = settings.request_timeout_seconds or None
+        result = await asyncio.wait_for(_invoke_with_retry(agent_kwargs, prompt), timeout=timeout)
 
         final_text = ""
         result_msg = getattr(result, "message", None)

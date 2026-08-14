@@ -29,7 +29,11 @@ def load_plugin_skills(skill_names: list[str]) -> AgentSkills | None:
 
     if not dirs:
         return None
-    return AgentSkills(skills=[str(d) for d in dirs])
+    try:
+        return AgentSkills(skills=[str(d) for d in dirs])
+    except Exception as exc:
+        log.warning("failed to construct AgentSkills for %s: %s", skill_names, exc)
+        return None
 
 
 def load_builtin_skills() -> AgentSkills | None:

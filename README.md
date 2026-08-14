@@ -2,10 +2,12 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/ci.yml?branch=main&label=CI)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/ci.yml)
 [![E2E](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/e2e.yml?branch=main&label=E2E)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/e2e.yml)
+[![Release](https://img.shields.io/github/v/release/omar-hindawi98/amxmodx-genai)](https://github.com/omar-hindawi98/amxmodx-genai/releases)
+[![AMX Mod X](https://img.shields.io/badge/AMX%20Mod%20X-1.8.2%2B-orange)](https://www.amxmodx.org/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-LLM agent bridge for AMXMODX game servers. Plugins call simple Pawn natives; a local Python TCP sidecar runs a Strands agent loop against the Anthropic API (or a local Ollama model) with two-tier persistent memory, plugin-registered tools and skills, and a composable system prompt.
+LLM agent bridge for AMX Mod X game servers. Plugins call simple Pawn natives; a local Python TCP sidecar runs a Strands agent loop against the Anthropic API (or a local Ollama model) with two-tier persistent memory, plugin-registered tools and skills, and a composable system prompt.
 
 ```mermaid
 graph LR
@@ -22,11 +24,10 @@ graph LR
 
 ## Requirements
 
-- AMXMODX 1.8.2+
-- [AMXMODX Sockets](https://www.amxmodx.org/sc/sockets.php) module
+- AMX Mod X 1.8.2+
+- [AMX Mod X Sockets](https://www.amxmodx.org/sc/sockets.php) module
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/)
-- `ANTHROPIC_API_KEY` environment variable (or Ollama for local inference)
 
 ## Installation
 
@@ -34,7 +35,7 @@ graph LR
 
 ```sh
 uv sync
-ANTHROPIC_API_KEY=sk-ant-... uv run genai-sidecar
+GENAI_MODEL_API_KEY=sk-ant-... uv run genai-sidecar
 ```
 
 Use Ollama instead of the Anthropic API:
@@ -43,7 +44,7 @@ Use Ollama instead of the Anthropic API:
 GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=llama3.2 uv run genai-sidecar
 ```
 
-### AMXMODX plugin
+### AMX Mod X plugin
 
 1. Compile `plugins/amxmodx_genai/core.sma` and copy `core.amxx` to `addons/amxmodx/plugins/`.
 2. Copy `plugins/include/amxmodx_genai.inc` to `addons/amxmodx/scripting/include/`.
@@ -53,25 +54,31 @@ GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=llama3.2 uv run genai-sidecar
 
 ### CVars (game server)
 
-| CVar | Default | Description |
-|------|---------|-------------|
-| `genai_host` | `127.0.0.1` | Sidecar host |
-| `genai_port` | `27016` | Sidecar port |
-| `genai_core_tools` | `1` | Enable built-in sidecar tools |
-| `genai_core_skills` | `1` | Enable built-in `amxmodx-reference` skill |
+| CVar                | Default     | Description                               |
+| ------------------- | ----------- | ----------------------------------------- |
+| `genai_host`        | `127.0.0.1` | Sidecar host                              |
+| `genai_port`        | `27016`     | Sidecar port                              |
+| `genai_core_tools`  | `1`         | Enable built-in sidecar tools             |
+| `genai_core_skills` | `1`         | Enable built-in `amxmodx-reference` skill |
 
 ### Environment variables (sidecar)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GENAI_HOST` | `127.0.0.1` | Bind address |
-| `GENAI_PORT` | `27016` | Bind port |
-| `GENAI_MODEL_BACKEND` | `anthropic` | `anthropic` or `ollama` |
-| `GENAI_MODEL_NAME` | `claude-haiku-4-5-20251001` | Model ID (Anthropic or Ollama) |
-| `GENAI_MODEL_TOKENS` | `512` | `max_tokens` per response |
-| `GENAI_MODEL_ENDPOINT` | `` | Model endpoint URL (e.g. Ollama base URL `http://localhost:11434`) |
-| `GENAI_MEMORY_PATH` | `~/.local/share/amxmodx_genai/memory.db` | SQLite memory file |
-| `GENAI_MEMORY_MAX_MESSAGES` | `20` | Conversation turns to keep in short-term memory (counts turns, not individual messages) |
+| Variable                        | Default                                  | Description                                                                                                                                                            |
+| ------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GENAI_HOST`                    | `127.0.0.1`                              | Bind address                                                                                                                                                           |
+| `GENAI_PORT`                    | `27016`                                  | Bind port                                                                                                                                                              |
+| `GENAI_MAX_CONCURRENT`          | `32`                                     | Maximum simultaneous in-flight requests                                                                                                                                |
+| `GENAI_REQUEST_TIMEOUT_SECONDS` | `60`                                     | Per-request LLM timeout in seconds. Set to `0` to disable.                                                                                                             |
+| `GENAI_AUTH_TOKEN`              | ``                                       | When non-empty, every `query` and `clear_memory` message must include a matching `auth_token` field or the request is rejected. Leave empty to disable auth (default). |
+| `GENAI_LOG_LEVEL`               | `INFO`                                   | Log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`                                                                                                                     |
+| `GENAI_MODEL_BACKEND`           | `anthropic`                              | LLM backend: `anthropic`, `bedrock`, `ollama`, `litellm`, or `openai`                                                                                                  |
+| `GENAI_MODEL_NAME`              | `claude-haiku-4-5-20251001`              | Model ID passed to the backend                                                                                                                                         |
+| `GENAI_MODEL_TOKENS`            | `2048`                                   | `max_tokens` per response                                                                                                                                              |
+| `GENAI_MODEL_API_KEY`           | ``                                       | API key for `anthropic`, `openai`, and `litellm` backends                                                                                                              |
+| `GENAI_MODEL_ENDPOINT`          | ``                                       | Custom endpoint URL (Ollama: `http://localhost:11434`, OpenAI-compatible proxies, etc.)                                                                                |
+| `GENAI_MEMORY_PATH`             | `~/.local/share/amxmodx_genai/memory.db` | SQLite memory file                                                                                                                                                     |
+| `GENAI_MEMORY_MAX_MESSAGES`     | `20`                                     | Conversation turns to keep in short-term memory (counts turns, not individual messages)                                                                                |
+| `GENAI_SKILLS_PATH`             | `~/.local/share/amxmodx_genai/skills`    | Directory where plugin skill subdirectories are resolved                                                                                                               |
 
 ## Plugin API
 

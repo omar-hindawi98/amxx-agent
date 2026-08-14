@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Strands tools require a JSON Schema `inputSchema` so the model receives proper type constraints. Without a schema, the model guesses argument format from the description and often passes wrong types or omits required fields. Pawn (the AMXMODX scripting language) has no native JSON Schema support and no dynamic data structures suitable for building a schema object at runtime. Having plugin authors write raw JSON schema strings in Pawn constants is fragile and verbose.
+Strands tools require a JSON Schema `inputSchema` so the model receives proper type constraints. Without a schema, the model guesses argument format from the description and often passes wrong types or omits required fields. Pawn (the AMX Mod X scripting language) has no native JSON Schema support and no dynamic data structures suitable for building a schema object at runtime. Having plugin authors write raw JSON schema strings in Pawn constants is fragile and verbose.
 
 ## Decision
 
