@@ -15,9 +15,8 @@ Demonstrates:
 - A custom tool (`get_my_weapon`) alongside the skill
 - Per-player memory isolated to this plugin (`this_plugin=true`)
 
-Requires the `cs16-strategy` skill directory to be present at
-`GENAI_SKILLS_PATH/weapon_advisor__cs16-strategy/` on the sidecar host
-(see `skills/cs16-strategy/` in this directory).
+Requires the skill directory to be deployed to `GENAI_SKILLS_PATH` on the sidecar host.
+The directory is included alongside this plugin at `weapon_advisor/skills/weapon_advisor__cs16-strategy/`.
 
 ---
 
@@ -53,14 +52,5 @@ The matching integration test is at
 `tests/integration/test_example_testable.py`.
 
 ---
-
-## skills/cs16-strategy/
-
-Example skill directory. Copy to `GENAI_SKILLS_PATH/<plugin>__cs16-strategy/`
-on the sidecar host, then register from the plugin with:
-
-```pawn
-genai_register_skill("cs16-strategy");
-```
 
 See [docs/plugin-api.md](../docs/plugin-api.md) for the full native reference.

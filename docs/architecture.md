@@ -49,7 +49,10 @@ Tools round-trip: the sidecar sends `tool_call` to the game server, the plugin c
 The sidecar always loads `SYSTEM_PROMPT.md` as the base. Plugins can only append their own `## plugin_name` section via `genai_set_plugin_context` / `genai_append_plugin_context`. Headings inside plugin context are shifted down two levels automatically so they never conflict with the base structure.
 
 **Swappable model backend.**
-Set `GENAI_MODEL_BACKEND` to switch LLM providers without code changes. Supported values: `anthropic` (default), `bedrock` (AWS), `ollama` (local), `litellm` (proxy - covers OpenRouter, Groq, Cohere, etc.), `openai` (OpenAI-compatible API).
+Set `GENAI_MODEL_BACKEND` to switch LLM providers without code changes. Supported values: `ollama` (default, local), `anthropic`, `bedrock` (AWS), `litellm` (proxy - covers OpenRouter, Groq, Cohere, etc.), `openai` (OpenAI-compatible API).
+
+**Session memory TTL and concurrency.**
+`GENAI_MEMORY_SESSION_TTL_DAYS` (default `0`, disabled) enables a background vacuum that removes sessions inactive for the specified number of days, preventing unbounded SQLite growth on long-running servers. `GENAI_SESSION_CONCURRENCY` (default `1`) controls how many in-flight requests are allowed per `session_id` simultaneously; raise it above `1` for shared sessions where multiple players query the same conversation at once (e.g. team sessions).
 
 ## Component map
 
@@ -62,12 +65,16 @@ Set `GENAI_MODEL_BACKEND` to switch LLM providers without code changes. Supporte
 | `plugins/amxmodx_genai/include/core_tools.inc` | Built-in tool definitions (registered by core.sma) |
 | `plugins/amxmodx_genai/include/core_skills.inc` | Built-in skill registration (amxmodx-reference) |
 | `plugins/include/amxmodx_genai.inc` | Public native declarations for third-party plugins |
-| `src/amxmodx_genai/server.py` | `asyncio.start_server` entry point |
+| `examples/weapon_advisor/` | Example: skills + custom tool + per-player memory |
+| `examples/weapon_advisor/skills/weapon_advisor__cs16-strategy/` | Skill directory shipped alongside `weapon_advisor`; deploy to `GENAI_SKILLS_PATH` on the sidecar |
+| `examples/admin_assistant/` | Example: access flags, `genai_append_plugin_context`, core tools |
+| `examples/testable/` | Example: observable plugin for integration testing |
+| `src/amxmodx_genai/server.py` | `asyncio.start_server` entry point; `_handle_persistent` multiplexes requests |
 | `src/amxmodx_genai/config.py` | Pydantic settings loaded from `GENAI_*` env vars |
 | `src/amxmodx_genai/logger.py` | Root logger configuration (level, format); call `setup()` once at startup |
 | `src/amxmodx_genai/core/handler.py` | Per-connection logic: reads query, runs agent, manages memory, sends frames |
 | `src/amxmodx_genai/core/protocol.py` | JSON framing helpers |
-| `src/amxmodx_genai/core/memory.py` | SQLite-backed two-tier memory: short-term turns + long-term summaries |
+| `src/amxmodx_genai/core/memory.py` | SQLite-backed two-tier memory: short-term turns + long-term summaries; vacuum task |
 | `src/amxmodx_genai/core/model.py` | Model factory: multi-backend LLM provider (Bedrock, Ollama, LiteLLM, OpenAI-compatible) |
 | `src/amxmodx_genai/core/messages.py` | Message type definitions for the wire protocol |
 | `src/amxmodx_genai/core/summarize.py` | LLM-based session summarization for long-term memory |

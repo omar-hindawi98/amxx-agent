@@ -21,16 +21,11 @@ public plugin_init()
 
     register_clcmd("say /weapon", "cmd_weapon");
 
-    genai_set_plugin_context(
-        "You are a Counter-Strike 1.6 weapon advisor. "
-        "Use the cs16-strategy skill to answer questions about weapons and tactics. "
-        "You can call get_my_weapon to check what the player currently has equipped. "
-        "Keep answers to two sentences maximum."
-    );
+    genai_set_plugin_context("You are a Counter-Strike 1.6 weapon advisor. Use the cs16-strategy skill to answer questions about weapons and tactics. You can call get_my_weapon to check what the player currently has equipped. Keep answers to two sentences maximum.");
 
     // Register the cs16-strategy skill so the AI loads it when handling requests
-    // from this plugin. The skill directory must exist at GENAI_SKILLS_PATH on
-    // the sidecar host (e.g. /opt/genai/skills/weapon_advisor__cs16-strategy/).
+    // from this plugin. Deploy skills/weapon_advisor__cs16-strategy/ from this
+    // directory to GENAI_SKILLS_PATH on the sidecar host before starting it.
     genai_register_skill("cs16-strategy");
 
     // Custom tool: what weapon is the player holding right now?

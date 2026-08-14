@@ -14,8 +14,14 @@ uv sync --dev
 uv run ruff check .          # lint
 uv run ruff format --check . # format check
 uv run ruff format .         # auto-format
-uv run pytest                # unit + integration (mocked agent, no API key needed)
+uv run pytest tests/unit     # unit tests (no API key, no network)
+uv run pytest tests/         # unit + integration (Ollama-dependent tests auto-skip when Ollama is unreachable)
 ```
+
+Integration tests use a real Ollama instance when reachable at `GENAI_MODEL_ENDPOINT`
+(default `http://localhost:11434`). Tests marked with `@requires_ollama` are skipped
+automatically when Ollama is not available, so no API key or network access is needed for
+the rest of the suite.
 
 ### Live integration tests
 
@@ -56,8 +62,9 @@ Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
 ## Pull requests
 
 - Keep PRs focused - one concern per PR
-- For sidecar changes, make sure `ruff check` and `ruff format --check` pass
-- For plugin changes, confirm the `.sma` compiles without warnings
+- For sidecar changes: `ruff check` and `ruff format --check` must pass
+- For plugin changes: the `.sma` must compile without warnings (CI runs the compiler)
+- For new example plugins: add the `.sma` under `examples/<name>/` - CI compiles all examples automatically
 - Fill in the PR template (What / Why / How to test)
 
 ## Project structure
@@ -75,6 +82,11 @@ plugins/
       skills/                - Bundled skill directories (e.g. amxmodx-reference)
   include/
     amxmodx_genai.inc        - Public native declarations for third-party plugins
+examples/
+  weapon_advisor/            - genai_register_skill + custom tool example
+    skills/                  - Skill directories shipped with this plugin
+  admin_assistant/           - Admin-only assistant with access flags and core tools
+  testable/                  - Observable plugin for integration testing
 src/amxmodx_genai/
   server.py                  - asyncio TCP listener entry point
   config.py                  - Pydantic settings (GENAI_* env vars)
@@ -93,8 +105,9 @@ src/amxmodx_genai/
   skills/
     loader.py                - Loads AgentSkills from disk
 tests/
-  unit/                      - Pure Python unit tests (no API key, no sidecar)
-  integration/               - TCP handler tests with mocked Strands Agent (no API key)
+  unit/                      - Pure Python unit tests (no API key, no network)
+  integration/               - TCP handler + tool roundtrip tests; Ollama tests skip when unreachable
                                test_live_sidecar.py requires a real API key
+                               test_example_testable.py exercises the testable/ example plugin
 docker/                      - HLDS container config for plugin e2e tests
 ```

@@ -62,22 +62,24 @@ GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=llama3.2 uv run genai-sidecar
 
 ### Environment variables (sidecar)
 
-| Variable                        | Default                                  | Description                                                                                                                                                            |
-| ------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GENAI_HOST`                    | `127.0.0.1`                              | Bind address                                                                                                                                                           |
-| `GENAI_PORT`                    | `27016`                                  | Bind port                                                                                                                                                              |
-| `GENAI_MAX_CONCURRENT`          | `32`                                     | Maximum simultaneous in-flight requests                                                                                                                                |
-| `GENAI_REQUEST_TIMEOUT_SECONDS` | `60`                                     | Per-request LLM timeout in seconds. Set to `0` to disable.                                                                                                             |
-| `GENAI_AUTH_TOKEN`              | ``                                       | When non-empty, every `query` and `clear_memory` message must include a matching `auth_token` field or the request is rejected. Leave empty to disable auth (default). |
-| `GENAI_LOG_LEVEL`               | `INFO`                                   | Log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`                                                                                                                     |
-| `GENAI_MODEL_BACKEND`           | `anthropic`                              | LLM backend: `anthropic`, `bedrock`, `ollama`, `litellm`, or `openai`                                                                                                  |
-| `GENAI_MODEL_NAME`              | `claude-haiku-4-5-20251001`              | Model ID passed to the backend                                                                                                                                         |
-| `GENAI_MODEL_TOKENS`            | `2048`                                   | `max_tokens` per response                                                                                                                                              |
-| `GENAI_MODEL_API_KEY`           | ``                                       | API key for `anthropic`, `openai`, and `litellm` backends                                                                                                              |
-| `GENAI_MODEL_ENDPOINT`          | ``                                       | Custom endpoint URL (Ollama: `http://localhost:11434`, OpenAI-compatible proxies, etc.)                                                                                |
-| `GENAI_MEMORY_PATH`             | `~/.local/share/amxmodx_genai/memory.db` | SQLite memory file                                                                                                                                                     |
-| `GENAI_MEMORY_MAX_MESSAGES`     | `10`                                     | Conversation turns to keep in short-term memory (counts turns, not individual messages)                                                                                |
-| `GENAI_SKILLS_PATH`             | `~/.local/share/amxmodx_genai/skills`    | Directory where plugin skill subdirectories are resolved                                                                                                               |
+| Variable                          | Default                                  | Description                                                                                                                                                            |
+| --------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GENAI_HOST`                      | `127.0.0.1`                              | Bind address                                                                                                                                                           |
+| `GENAI_PORT`                      | `27016`                                  | Bind port                                                                                                                                                              |
+| `GENAI_MAX_CONCURRENT`            | `32`                                     | Maximum simultaneous in-flight requests                                                                                                                                |
+| `GENAI_REQUEST_TIMEOUT_SECONDS`   | `60`                                     | Per-request LLM timeout in seconds. Set to `0` to disable.                                                                                                            |
+| `GENAI_AUTH_TOKEN`                | ``                                       | When non-empty, every `query` and `clear_memory` message must include a matching `auth_token` field or the request is rejected. Leave empty to disable auth (default). |
+| `GENAI_LOG_LEVEL`                 | `INFO`                                   | Log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`                                                                                                                     |
+| `GENAI_MODEL_BACKEND`             | `ollama`                                 | LLM backend: `anthropic`, `bedrock`, `ollama`, `litellm`, or `openai`                                                                                                 |
+| `GENAI_MODEL_NAME`                | `llama3.2:1b`                            | Model ID passed to the backend                                                                                                                                         |
+| `GENAI_MODEL_TOKENS`              | `2048`                                   | `max_tokens` per response                                                                                                                                              |
+| `GENAI_MODEL_API_KEY`             | ``                                       | API key for `anthropic`, `openai`, and `litellm` backends                                                                                                              |
+| `GENAI_MODEL_ENDPOINT`            | ``                                       | Custom endpoint URL (Ollama: `http://localhost:11434`, OpenAI-compatible proxies, etc.)                                                                                |
+| `GENAI_MEMORY_PATH`               | `~/.local/share/amxmodx_genai/memory.db` | SQLite memory file                                                                                                                                                     |
+| `GENAI_MEMORY_MAX_MESSAGES`       | `10`                                     | Conversation turns to keep in short-term memory (counts turns, not individual messages)                                                                                |
+| `GENAI_MEMORY_SESSION_TTL_DAYS`   | `0`                                      | Sessions not written to in this many days are vacuumed. `0` disables vacuum.                                                                                           |
+| `GENAI_SESSION_CONCURRENCY`       | `1`                                      | Max concurrent in-flight requests per `session_id`. Raise above `1` for shared sessions used by multiple players simultaneously (e.g. team sessions).                 |
+| `GENAI_SKILLS_PATH`               | `~/.local/share/amxmodx_genai/skills`    | Directory where plugin skill subdirectories are resolved                                                                                                               |
 
 ## Plugin API
 
@@ -197,6 +199,18 @@ public tool_player_info(player, const args[], result[], maxlen)
 ```
 
 See [docs/plugin-api.md](docs/plugin-api.md) for the full API reference.
+
+## Examples
+
+The `examples/` directory contains ready-to-compile example plugins:
+
+| Directory | What it shows |
+|-----------|--------------|
+| `weapon_advisor/` | `genai_register_skill`, custom tool, per-player memory |
+| `admin_assistant/` | Access flags, `genai_append_plugin_context`, core tools, chat chunking |
+| `testable/` | Observable side effects for integration testing; paired with `tests/integration/test_example_testable.py` |
+
+See [`examples/README.md`](examples/README.md) for details.
 
 ## Memory
 

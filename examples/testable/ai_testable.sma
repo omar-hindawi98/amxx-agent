@@ -44,13 +44,7 @@ public plugin_init()
 
     register_clcmd("say /test_ask", "cmd_test_ask");
 
-    genai_set_plugin_context(
-        "You are a test harness assistant. "
-        "You have access to tools: get_log (read the in-memory log), "
-        "set_value (store a key-value pair), get_value (read a stored value). "
-        "When asked to store something, call set_value. "
-        "When asked what is in the log, call get_log."
-    );
+    genai_set_plugin_context("You are a test harness assistant. You have access to tools: get_log (read the in-memory log), set_value (store a key-value pair), get_value (read a stored value). When asked to store something, call set_value. When asked what is in the log, call get_log.");
 
     // Tool: read the accumulated log lines.
     genai_register_tool(

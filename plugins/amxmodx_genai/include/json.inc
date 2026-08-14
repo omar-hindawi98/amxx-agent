@@ -1,9 +1,11 @@
-// Minimal flat-JSON helpers. Requires constants.inc.
+// Minimal flat-JSON helpers.
 
 #if defined _amxgenai_json_included
     #endinput
 #endif
 #define _amxgenai_json_included
+
+#include "constants"
 
 stock json_escape(const src[], dst[], max_dst)
 {

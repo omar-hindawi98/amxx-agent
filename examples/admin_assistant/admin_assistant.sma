@@ -26,11 +26,7 @@ public plugin_init()
     register_clcmd("say /ai_reset", "cmd_ai_reset");
     register_concmd("amx_ai",       "cmd_ai", REQUIRED_ACCESS);
 
-    genai_set_plugin_context(
-        "You are an AI assistant for server administrators on a Counter-Strike 1.6 server. "
-        "Use the available tools to look up players, check server state, or take moderation actions. "
-        "Always confirm destructive actions (kick, ban) before executing them."
-    );
+    genai_set_plugin_context("You are an AI assistant for server administrators on a Counter-Strike 1.6 server. Use the available tools to look up players, check server state, or take moderation actions. Always confirm destructive actions (kick, ban) before executing them.");
 
     // Append live server info so the AI has it in every conversation.
     new map[36];
