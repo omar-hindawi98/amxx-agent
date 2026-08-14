@@ -20,6 +20,13 @@ Plugin tool calls round-trip over the same persistent TCP connection (see ADR 00
 
 Built-in sidecar tools (e.g. `current_datetime`) resolve without a round-trip - they run directly in the sidecar.
 
+## Alternatives Considered
+
+- **Python shims in the sidecar** - the sidecar re-implements tool logic in Python; breaks the whole premise that plugin authors write tools in Pawn with direct access to live game state.
+- **Sidecar opens a reverse connection to AMX Mod X** - requires AMX Mod X to listen on a second port, adding complexity and a second connection lifecycle to manage.
+- **Pre-registered result cache (plugin pushes data before query)** - plugin pushes live state into the sidecar before each query so tools resolve locally; requires predicting which data the agent will need and keeping it fresh, which is not viable for dynamic tool calls.
+- **gRPC / MessagePack** - lower overhead and stronger typing, but adds external dependencies and build complexity for both the Python sidecar and the Pawn plugin.
+
 ## Consequences
 
 - Plugin tools have full access to live game state (player positions, scores, cvars, etc.).

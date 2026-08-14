@@ -2,7 +2,7 @@
 
 ## Overview
 
-amxmodx_genai is a generic AI agent bridge for AMX Mod X game servers. It connects any AMX Mod X plugin to the Anthropic API (or a local Ollama model) through a local Python sidecar. The game server never speaks HTTPS directly; the sidecar owns that boundary.
+amxmodx_genai is a generic AI agent bridge for AMX Mod X game servers. It connects any AMX Mod X plugin to a configurable LLM backend through a local Python sidecar. The game server never speaks HTTPS directly; the sidecar owns that boundary.
 
 Plugin authors wire their own tools, system prompts, skills, and session logic. The bridge itself provides no game-specific knowledge.
 
@@ -25,7 +25,7 @@ graph TD
     end
 
     core <-->|"newline-delimited JSON\nTCP protocol v2"| server
-    model <-->|HTTPS or local| llm["LLM\n(Anthropic API or Ollama)"]
+    model <-->|HTTPS or local| llm["LLM"]
 ```
 
 ## Key design decisions
@@ -68,7 +68,7 @@ Set `GENAI_MODEL_BACKEND` to switch LLM providers without code changes. Supporte
 | `src/amxmodx_genai/core/handler.py` | Per-connection logic: reads query, runs agent, manages memory, sends frames |
 | `src/amxmodx_genai/core/protocol.py` | JSON framing helpers |
 | `src/amxmodx_genai/core/memory.py` | SQLite-backed two-tier memory: short-term turns + long-term summaries |
-| `src/amxmodx_genai/core/model.py` | Model factory: Anthropic, Bedrock, Ollama, LiteLLM, OpenAI |
+| `src/amxmodx_genai/core/model.py` | Model factory: multi-backend LLM provider (Bedrock, Ollama, LiteLLM, OpenAI-compatible) |
 | `src/amxmodx_genai/core/messages.py` | Message type definitions for the wire protocol |
 | `src/amxmodx_genai/core/summarize.py` | LLM-based session summarization for long-term memory |
 | `src/amxmodx_genai/tools/plugin.py` | Dynamic tool factory for AMX Mod X-registered tools (typed JSON schema, ID-matched round-trip) |

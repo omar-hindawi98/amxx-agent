@@ -1,3 +1,8 @@
+// native_query assembles large JSON buffers on the stack
+// (escaped prompt/system at 2*MAX_PROMPT/MAX_SYSTEM, request at ~65k cells).
+// Total peak stack usage is ~145k cells; this pragma must exceed that.
+#pragma dynamic 196608
+
 #include <amxmodx>
 #include <sockets>
 #include <constants>
@@ -32,6 +37,7 @@ public plugin_init()
 
     register_library("amxmodx_genai");
 
+    register_native("genai_query_player",          "native_query_player");
     register_native("genai_query",                 "native_query");
     register_native("genai_cancel",                "native_cancel");
     register_native("genai_is_pending",            "native_is_pending");
@@ -41,6 +47,7 @@ public plugin_init()
     register_native("genai_register_tool",         "native_register_tool");
     register_native("genai_add_tool_param",        "native_add_tool_param");
     register_native("genai_register_skill",        "native_register_skill");
+    register_native("genai_clear_longterm_memory", "native_clear_longterm_memory");
 
     if (get_pcvar_num(g_pCvarCoreTools))
         register_core_tools();
@@ -137,11 +144,16 @@ static bool:dispatch_message(i, const line[])
         new text[MAX_RESPONSE];
         json_get_string(line, "text", text, sizeof(text) - 1);
         copy(g_szQueueResponse[i], MAX_RESPONSE - 1, text);
+        new status[8];
+        json_get_string(line, "status", status, sizeof(status) - 1);
+        g_bQueueError[i] = bool:equal(status, "error");
 
     } else if (equal(msg_type, "done")) {
         callfunc_begin(g_szQueueCallback[i], g_szQueuePlugin[i]);
-        callfunc_push_int(g_iQueuePlayer[i]);
+        if (!g_bQueueNoPlayer[i])
+            callfunc_push_int(g_iQueuePlayer[i]);
         callfunc_push_str(g_szQueueResponse[i]);
+        callfunc_push_int(g_bQueueError[i] ? 1 : 0);
         callfunc_end();
 
         free_slot(i);
@@ -163,8 +175,10 @@ public task_poll_sockets()
                 if (!g_bQueueUsed[i])
                     continue;
                 callfunc_begin(g_szQueueCallback[i], g_szQueuePlugin[i]);
-                callfunc_push_int(g_iQueuePlayer[i]);
+                if (!g_bQueueNoPlayer[i])
+                    callfunc_push_int(g_iQueuePlayer[i]);
                 callfunc_push_str("(AI connection dropped)");
+                callfunc_push_int(1); // is_error = true
                 callfunc_end();
                 free_slot(i);
             }
@@ -217,28 +231,13 @@ public task_poll_sockets()
         g_bPolling = false;
 }
 
-// ---- natives ----------------------------------------------------------------
+// ---- send_query_frame -------------------------------------------------------
+// Shared implementation for all genai_query_* variants. Builds and sends the
+// JSON query frame, allocates a queue slot, and starts the poll task.
+// Returns the slot index on success, -1 on error.
 
-public native_query(plugin_id, num_params)
+static send_query_frame(plugin_id, player, const prompt[], const callback[], const session_id[], bool:no_memory)
 {
-    new player = get_param(1);
-
-    new prompt[MAX_PROMPT];
-    get_string(2, prompt, MAX_PROMPT - 1);
-
-    new callback[MAX_CALLBACK];
-    get_string(3, callback, MAX_CALLBACK - 1);
-
-    // optional session_id - defaults to SteamID (stable across reconnects), then player index
-    new session_id[MAX_SESSION_ID];
-    if (num_params >= 4)
-        get_string(4, session_id, MAX_SESSION_ID - 1);
-    if (!session_id[0]) {
-        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
-        if (!session_id[0])
-            num_to_str(player, session_id, MAX_SESSION_ID - 1);
-    }
-
     new slot = find_free_slot();
     if (slot == -1) {
         log_amx("[GenAI] queue full, dropping request for session %s", session_id);
@@ -248,7 +247,6 @@ public native_query(plugin_id, num_params)
     if (!ensure_connected())
         return -1;
 
-    // Assign a unique request_id for multiplexing over the persistent socket.
     g_iRequestCounter++;
     new request_id[MAX_REQUEST_ID];
     num_to_str(g_iRequestCounter, request_id, MAX_REQUEST_ID - 1);
@@ -266,7 +264,6 @@ public native_query(plugin_id, num_params)
         new escaped_desc[MAX_TOOL_DESC * 2];
         json_escape(g_szToolName[t], escaped_name, sizeof(escaped_name) - 1);
         json_escape(g_szToolDesc[t], escaped_desc, sizeof(escaped_desc) - 1);
-
         new entry[MAX_TOOL_NAME * 2 + MAX_TOOL_DESC * 2 + MAX_TOOL_PARAMS_JSON + 48];
         format(entry, sizeof(entry) - 1,
             "%s{^"name^":^"%s^",^"description^":^"%s^",^"params^":%s}",
@@ -287,7 +284,6 @@ public native_query(plugin_id, num_params)
     }
     add(skills_json, sizeof(skills_json) - 1, "]");
 
-    // Strip .amxx to get a clean plugin name for the system prompt section heading.
     new plugin_name[MAX_PLUGIN_NAME];
     copy(plugin_name, MAX_PLUGIN_NAME - 1, plugin_filename);
     new ext2 = strfind(plugin_name, ".amxx");
@@ -307,26 +303,101 @@ public native_query(plugin_id, num_params)
 
     new request[MAX_PROMPT * 2 + MAX_SYSTEM * 2 + MAX_TOOLS * (MAX_TOOL_NAME + MAX_TOOL_DESC + MAX_TOOL_PARAMS_JSON + 48) + MAX_SKILLS * (MAX_SKILL_NAME * 2 + 4) + 320];
     format(request, sizeof(request) - 1,
-        "{^"type^":^"query^",^"request_id^":^"%s^",^"player^":%d,^"session_id^":^"%s^",^"prompt^":^"%s^",^"plugin^":^"%s^",^"system^":^"%s^",^"tools^":%s,^"skills^":%s}^n",
-        escaped_rid, player, escaped_session, escaped_prompt, escaped_plugin, escaped_system, tools_json, skills_json);
+        "{^"type^":^"query^",^"request_id^":^"%s^",^"player^":%d,^"session_id^":^"%s^",^"prompt^":^"%s^",^"plugin^":^"%s^",^"system^":^"%s^",^"tools^":%s,^"skills^":%s,^"no_memory^":%s}^n",
+        escaped_rid, player, escaped_session, escaped_prompt, escaped_plugin, escaped_system, tools_json, skills_json,
+        no_memory ? "true" : "false");
 
     socket_send(g_iMainSocket, request, strlen(request));
 
-    g_bQueueUsed[slot]        = true;
-    g_iQueuePlayer[slot]      = player;
+    g_bQueueUsed[slot]         = true;
+    g_bQueueNoPlayer[slot]     = (player == 0);
+    g_iQueuePlayer[slot]       = player;
     copy(g_szQueueRequestId[slot],  MAX_REQUEST_ID  - 1, request_id);
     copy(g_szQueueCallback[slot],   MAX_CALLBACK    - 1, callback);
     copy(g_szQueuePlugin[slot],     MAX_PLUGIN_NAME - 1, plugin_filename);
     copy(g_szQueueSessionId[slot],  MAX_SESSION_ID  - 1, session_id);
     g_szQueueResponse[slot][0] = 0;
 
-    // Kick off the poll task if it is not already running.
     if (!g_bPolling) {
         g_bPolling = true;
         set_task(0.1, "task_poll_sockets");
     }
 
     return slot;
+}
+
+// ---- session id helpers -----------------------------------------------------
+
+static get_steamid_or_server(player, session_id[], maxlen)
+{
+    get_user_authid(player, session_id, maxlen);
+    if (!session_id[0])
+        copy(session_id, maxlen, "server");
+}
+
+// ---- natives ----------------------------------------------------------------
+
+// genai_query_player: per-player memory.
+// this_plugin=true isolates memory to this plugin; false shares it across all plugins.
+public native_query_player(plugin_id, num_params)
+{
+    new player = get_param(1);
+    new prompt[MAX_PROMPT];
+    get_string(2, prompt, MAX_PROMPT - 1);
+    new callback[MAX_CALLBACK];
+    get_string(3, callback, MAX_CALLBACK - 1);
+    new this_plugin = (num_params >= 4) ? (get_param(4) != 0) : 0;
+    new no_memory   = (num_params >= 5) ? (get_param(5) != 0) : 0;
+
+    new steamid[MAX_SESSION_ID];
+    get_steamid_or_server(player, steamid, MAX_SESSION_ID - 1);
+
+    new session_id[MAX_SESSION_ID];
+    if (this_plugin) {
+        new plugin_filename[MAX_PLUGIN_NAME];
+        get_plugin(plugin_id, plugin_filename, MAX_PLUGIN_NAME - 1);
+        new prefix[MAX_PLUGIN_NAME];
+        copy(prefix, MAX_PLUGIN_NAME - 1, plugin_filename);
+        new ext = strfind(prefix, ".amxx");
+        if (ext != -1)
+            prefix[ext] = 0;
+        format(session_id, MAX_SESSION_ID - 1, "%s__%s", prefix, steamid);
+    } else {
+        copy(session_id, MAX_SESSION_ID - 1, steamid);
+    }
+
+    return send_query_frame(plugin_id, player, prompt, callback, session_id, bool:no_memory);
+}
+
+// genai_query: explicit session key for custom scopes (team, server, etc.)
+// No player param - callback signature is (const response[]) not (player, response[]).
+public native_query(plugin_id, num_params)
+{
+    new prompt[MAX_PROMPT];
+    get_string(1, prompt, MAX_PROMPT - 1);
+    new callback[MAX_CALLBACK];
+    get_string(2, callback, MAX_CALLBACK - 1);
+    new session_id[MAX_SESSION_ID];
+    get_string(3, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0])
+        copy(session_id, MAX_SESSION_ID - 1, "server");
+    new this_plugin = (num_params >= 4) ? (get_param(4) != 0) : 0;
+    new no_memory   = (num_params >= 5) ? (get_param(5) != 0) : 0;
+
+    if (this_plugin) {
+        new plugin_filename[MAX_PLUGIN_NAME];
+        get_plugin(plugin_id, plugin_filename, MAX_PLUGIN_NAME - 1);
+        new prefix[MAX_PLUGIN_NAME];
+        copy(prefix, MAX_PLUGIN_NAME - 1, plugin_filename);
+        new ext = strfind(prefix, ".amxx");
+        if (ext != -1)
+            prefix[ext] = 0;
+        new scoped[MAX_SESSION_ID];
+        format(scoped, MAX_SESSION_ID - 1, "%s__%s", prefix, session_id);
+        return send_query_frame(plugin_id, 0, prompt, callback, scoped, bool:no_memory);
+    }
+
+    return send_query_frame(plugin_id, 0, prompt, callback, session_id, bool:no_memory);
 }
 
 public native_cancel(plugin_id, num_params)
@@ -338,7 +409,7 @@ public native_cancel(plugin_id, num_params)
     if (!session_id[0]) {
         get_user_authid(player, session_id, MAX_SESSION_ID - 1);
         if (!session_id[0])
-            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+            copy(session_id, MAX_SESSION_ID - 1, "server");
     }
 
     new slot = find_session_slot(session_id, player);
@@ -355,7 +426,7 @@ public native_is_pending(plugin_id, num_params)
     if (!session_id[0]) {
         get_user_authid(player, session_id, MAX_SESSION_ID - 1);
         if (!session_id[0])
-            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+            copy(session_id, MAX_SESSION_ID - 1, "server");
     }
 
     return (find_session_slot(session_id, player) != -1) ? 1 : 0;
@@ -401,7 +472,7 @@ public native_clear_memory(plugin_id, num_params)
     if (!session_id[0]) {
         get_user_authid(player, session_id, MAX_SESSION_ID - 1);
         if (!session_id[0])
-            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+            copy(session_id, MAX_SESSION_ID - 1, "server");
     }
 
     if (!ensure_connected())
@@ -514,4 +585,30 @@ public native_register_skill(plugin_id, num_params)
 
     format(g_szSkillName[g_iSkillCount], MAX_SKILL_NAME - 1, "%s__%s", prefix, name);
     g_iSkillCount++;
+}
+
+// Clears long-term (summary) memory for a session without touching short-term memory.
+public native_clear_longterm_memory(plugin_id, num_params)
+{
+    new player = get_param(1);
+    new session_id[MAX_SESSION_ID];
+    if (num_params >= 2)
+        get_string(2, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0]) {
+        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
+        if (!session_id[0])
+            copy(session_id, MAX_SESSION_ID - 1, "server");
+    }
+
+    if (!ensure_connected())
+        return;
+
+    new escaped_session[MAX_SESSION_ID * 2];
+    json_escape(session_id, escaped_session, sizeof(escaped_session) - 1);
+
+    new request[MAX_SESSION_ID * 2 + 96];
+    format(request, sizeof(request) - 1,
+        "{^"type^":^"clear_longterm^",^"request_id^":^"0^",^"player^":%d,^"session_id^":^"%s^"}^n",
+        player, escaped_session);
+    socket_send(g_iMainSocket, request, strlen(request));
 }

@@ -11,13 +11,9 @@ authors = [{ name = "omar-hindawi98" }]
 dependencies = [
     "pydantic-settings>=2.15.0",
     "sqlalchemy>=2.0.52",
-    "strands-agents[anthropic]>=0.1.0",
-]
-
-[project.optional-dependencies]
-ollama = [
     "strands-agents[ollama]>=0.1.0",
 ]
+
 
 [project.scripts]
 genai-sidecar = "amxmodx_genai.server:serve_cli"

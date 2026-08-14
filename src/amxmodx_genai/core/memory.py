@@ -10,10 +10,11 @@ Two tiers:
 """
 
 import json
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import Integer, String, Text, create_engine, delete, event, select
+from sqlalchemy import Float, Integer, String, Text, create_engine, delete, event, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from amxmodx_genai.config import settings
@@ -38,6 +39,13 @@ class _LongtermRow(_Base):
     session_id: Mapped[str] = mapped_column(String, primary_key=True)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class _SessionMetaRow(_Base):
+    __tablename__ = "session_meta"
+
+    session_id: Mapped[str] = mapped_column(String, primary_key=True)
+    last_seen: Mapped[float] = mapped_column(Float, nullable=False)
 
 
 def _make_engine(path: Path | None = None):
@@ -116,6 +124,12 @@ def update(session_id: str, prompt: str, response: str) -> None:
             .where(_SessionRow.session_id == session_id)
             .where(_SessionRow.seq.not_in(keep_seqs))
         )
+        meta = db.get(_SessionMetaRow, session_id)
+        now_ts = time.time()
+        if meta:
+            meta.last_seen = now_ts
+        else:
+            db.add(_SessionMetaRow(session_id=session_id, last_seen=now_ts))
 
 
 def clear(session_id: str) -> None:
@@ -141,3 +155,29 @@ def set_longterm(session_id: str, summary: str) -> None:
             row.updated_at = now
         else:
             db.add(_LongtermRow(session_id=session_id, summary=summary, updated_at=now))
+
+
+def clear_longterm(session_id: str) -> None:
+    """Delete the long-term summary for session_id, if any."""
+    with Session(_engine) as db, db.begin():
+        row = db.get(_LongtermRow, session_id)
+        if row:
+            db.delete(row)
+
+
+def vacuum(ttl_days: int) -> int:
+    """Delete all data for sessions not written to in ttl_days days.
+
+    Returns the number of sessions removed.
+    """
+    cutoff = time.time() - ttl_days * 86400
+    with Session(_engine) as db, db.begin():
+        stale = db.scalars(
+            select(_SessionMetaRow.session_id).where(_SessionMetaRow.last_seen < cutoff)
+        ).all()
+        if not stale:
+            return 0
+        db.execute(delete(_SessionRow).where(_SessionRow.session_id.in_(stale)))
+        db.execute(delete(_LongtermRow).where(_LongtermRow.session_id.in_(stale)))
+        db.execute(delete(_SessionMetaRow).where(_SessionMetaRow.session_id.in_(stale)))
+        return len(stale)

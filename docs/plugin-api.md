@@ -10,25 +10,69 @@ Copy `plugins/include/amxmodx_genai.inc` to your server's `addons/amxmodx/script
 
 ## Natives
 
-### genai_query
+### genai_query_player
 
 ```pawn
-native genai_query(player, const prompt[], const callback[], const session_id[] = "");
+native genai_query_player(player, const prompt[], const callback[], bool:this_plugin = false, bool:no_memory = false);
 ```
 
-Sends a prompt to the agent. The response is delivered asynchronously to `callback` in the calling plugin.
+Sends a prompt scoped to this player's memory. The session key is the player's SteamID so memory survives reconnects and map changes.
 
 ```pawn
 // callback signature
-public on_response(player, const response[])
+public on_response(player, const response[], bool:is_error)
 ```
+
+`is_error` is `true` when the response is a sidecar error (timeout, unauthorized, AI unavailable) rather than a real AI reply.
+
+| Parameter | Description |
+|-----------|-------------|
+| `player` | Client index |
+| `prompt` | User message to send |
+| `callback` | Name of public function in calling plugin to receive response |
+| `this_plugin` | When `false` (default), memory is shared across all plugins for the same player. When `true`, memory is isolated to this plugin only (session key becomes `"{plugin}__{steamid}"`). |
+| `no_memory` | When `true`, the query runs with no history and the response is not stored. Use for one-off lookups that should not pollute the session. |
 
 Returns the queue slot index on success, or `-1` if the queue is full or the socket failed to open.
 
-`session_id` identifies the conversation memory. When empty (default), it is automatically set to the player's SteamID (via `get_user_authid`). For bots and LAN clients without a SteamID, it falls back to `str(player)`. Use a custom string to:
-- Share memory across players: `"ct_team"`, `"t_team"`
-- Create player-independent sessions: `"round_debrief"`, `"server"`
-- Use a different identifier for the same player: `"player_3_context_1"`
+---
+
+### genai_query
+
+```pawn
+native genai_query(const prompt[], const callback[], const session_id[], bool:this_plugin = false, bool:no_memory = false);
+```
+
+Sends a prompt with an explicit session key. Use for team/group sessions, server-wide sessions, or any custom shared context. All callers that pass the same `session_id` share the same memory.
+
+```pawn
+// callback signature - no player parameter
+public on_team_response(const response[], bool:is_error)
+```
+
+`is_error` is `true` when the response is a sidecar error rather than a real AI reply.
+
+| Parameter | Description |
+|-----------|-------------|
+| `prompt` | User message to send |
+| `callback` | Name of public function in calling plugin to receive response |
+| `session_id` | Conversation history key. All callers passing the same value share memory. |
+| `this_plugin` | When `true`, prefixes `session_id` with this plugin's name so two plugins using `"team_ct"` don't share the same memory. |
+| `no_memory` | When `true`, the query runs with no history and the response is not stored. |
+
+Returns the queue slot index on success, or `-1` if the queue is full or the socket failed to open.
+
+**Session scope examples:**
+
+```pawn
+// Team session - all CTs share one conversation
+new session[32];
+format(session, sizeof(session) - 1, "team_%d", get_user_team(id));
+genai_query("What is our team strategy?", "on_team_response", session);
+
+// Server-wide session
+genai_query("Summarize the last round.", "on_summary", "server");
+```
 
 ---
 
@@ -48,7 +92,7 @@ Cancels any pending query for this player or session. No callback is fired.
 native bool:genai_is_pending(player, const session_id[] = "");
 ```
 
-Returns `true` if a query is currently in-flight for this player or session.
+Returns `true` if a query is currently in-flight for this player or session. The `session_id` defaults to the player's SteamID when empty.
 
 ---
 
@@ -87,7 +131,7 @@ public plugin_init()
 native genai_clear_memory(player, const session_id[] = "");
 ```
 
-Clears short-term memory (conversation turns) for a session. Call on player disconnect or when starting a new context.
+Clears short-term memory (conversation turns) for a session. Call on player disconnect or when starting a new context. The `session_id` defaults to the player's SteamID when empty.
 
 Before deleting the turns, the sidecar summarizes the session and merges the summary into long-term memory. The next query for that session will have the summary injected into its system prompt. Long-term memory is never cleared by this call.
 
@@ -139,6 +183,16 @@ genai_register_tool("get_player_info", "Returns info about a player", "tool_play
 genai_add_tool_param("player_id",     "integer", true,  "Player index (1-32)");
 genai_add_tool_param("include_stats", "boolean", false, "Include frags, deaths, and assists");
 ```
+
+---
+
+### genai_clear_longterm_memory
+
+```pawn
+native genai_clear_longterm_memory(player, const session_id[] = "");
+```
+
+Deletes the long-term (summary) memory for a session without touching short-term memory. Unlike `genai_clear_memory`, no summarization is performed - the persistent summary is discarded entirely. Use for a full memory reset, e.g. at the start of a new season when past context is no longer relevant.
 
 ---
 
@@ -205,13 +259,13 @@ public plugin_init()
     genai_append_plugin_context("Keep answers brief: one or two sentences.");
 
     genai_register_tool("get_map", "Returns the current map name", "tool_get_map");
-    // No params needed - get_map takes no arguments.
-
     genai_register_skill("tactics");
 
-    register_clcmd("say /ask", "cmd_ask");
+    register_clcmd("say /ask",  "cmd_ask");
+    register_clcmd("say /team", "cmd_ask_team");
 }
 
+// Per-player query - memory shared across all plugins
 public cmd_ask(id)
 {
     if (genai_is_pending(id)) {
@@ -228,24 +282,33 @@ public cmd_ask(id)
         return PLUGIN_HANDLED;
     }
 
-    genai_query(id, args, "on_response");
+    genai_query_player(id, args, "on_response");
     return PLUGIN_HANDLED;
 }
 
-// Team-scoped session: all CTs share one conversation
+// Team session - all players on the same team share one conversation
 public cmd_ask_team(id)
 {
     new session[32];
-    new team = get_user_team(id);
-    format(session, sizeof(session) - 1, "team_%d", team);
-
-    genai_query(id, "What is our team strategy?", "on_response", session);
+    format(session, sizeof(session) - 1, "team_%d", get_user_team(id));
+    genai_query("What is our team strategy?", "on_team_response", session);
     return PLUGIN_HANDLED;
 }
 
-public on_response(id, const response[])
+public on_response(id, const response[], bool:is_error)
 {
+    if (is_error) {
+        client_print(id, print_chat, "[AI] Error: %s", response);
+        return;
+    }
     client_print(id, print_chat, "[AI] %s", response);
+}
+
+public on_team_response(const response[], bool:is_error)
+{
+    for (new i = 1; i <= get_maxplayers(); i++)
+        if (is_user_connected(i))
+            client_print(i, print_chat, "%s %s", is_error ? "[AI Error]" : "[Team AI]", response);
 }
 
 public tool_get_map(player, const args[], result[], maxlen)
@@ -308,8 +371,8 @@ Build domain knowledge into `genai_set_plugin_context` / `genai_append_plugin_co
 | `MAX_TOOLS` | 32 | Registered tools across all plugins |
 | `MAX_SKILLS` | 32 | Registered skills across all plugins |
 | `MAX_SESSION_ID` | 64 | Session ID string length |
-| `MAX_PROMPT` | 1024 | Prompt string length |
+| `MAX_PROMPT` | 8192 | Prompt string length |
 | `MAX_RESPONSE` | 4096 | Response / tool result buffer |
-| `MAX_SYSTEM` | 2048 | System prompt context length (per plugin) |
+| `MAX_SYSTEM` | 8192 | System prompt context length (per plugin) |
 
 These are defined in `plugins/amxmodx_genai/include/constants.inc`.

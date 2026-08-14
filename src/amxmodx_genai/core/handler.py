@@ -13,10 +13,13 @@ from pathlib import Path
 from typing import Any
 
 from strands import Agent
+from strands.hooks import AfterModelCallEvent, BeforeInvocationEvent, HookProvider, HookRegistry
+from strands.types.content import SystemContentBlock
+from strands.types.exceptions import ContextWindowOverflowException, MaxTokensReachedException
 
 from amxmodx_genai.config import settings
 from amxmodx_genai.core import memory
-from amxmodx_genai.core.messages import ClearMemoryMsg, QueryMsg
+from amxmodx_genai.core.messages import ClearLongtermMsg, ClearMemoryMsg, QueryMsg
 from amxmodx_genai.core.model import get_model
 from amxmodx_genai.core.summarize import summarize_session
 from amxmodx_genai.skills import load_builtin_skills, load_plugin_skills
@@ -33,7 +36,7 @@ except OSError as _exc:
     log.warning("could not read system prompt from %s: %s", _SYSTEM_PROMPT_PATH, _exc)
     _BASE_SYSTEM_PROMPT = ""
 
-_MAX_RETRIES = 1
+_MAX_HOOK_RETRIES = 1
 
 # Loaded once at import time; None when no built-in skills exist or loading fails.
 try:
@@ -41,6 +44,37 @@ try:
 except Exception as _exc:
     log.warning("failed to load built-in skills: %s", _exc)
     _BUILTIN_SKILLS = None
+
+_UNRECOVERABLE = (MaxTokensReachedException, ContextWindowOverflowException)
+
+
+class _RetryHook(HookProvider):
+    """Retry transient model-call failures with exponential backoff."""
+
+    def __init__(self) -> None:
+        self._count = 0
+
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(BeforeInvocationEvent, self._reset)
+        registry.add_callback(AfterModelCallEvent, self._maybe_retry)
+
+    def _reset(self, event: BeforeInvocationEvent) -> None:
+        self._count = 0
+
+    async def _maybe_retry(self, event: AfterModelCallEvent) -> None:
+        if not event.exception or isinstance(event.exception, _UNRECOVERABLE):
+            return
+        if self._count < _MAX_HOOK_RETRIES:
+            self._count += 1
+            log.warning(
+                "model call failed (%s), retry %d/%d",
+                event.exception,
+                self._count,
+                _MAX_HOOK_RETRIES,
+            )
+            event.retry = True
+            await asyncio.sleep(2.0**self._count)
+
 
 # Type alias for the send callable passed in by the server.
 _Send = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
@@ -70,7 +104,7 @@ async def handle(
     try:
         if msg.get("type") == "clear_memory":
             req = ClearMemoryMsg.model_validate(msg)
-            session_id = req.session_id or str(req.player)
+            session_id = req.session_id or "server"
             history = await asyncio.to_thread(memory.get, session_id)
             if history:
                 prior = await asyncio.to_thread(memory.get_longterm, session_id)
@@ -85,22 +119,30 @@ async def handle(
             log.info("cleared short-term memory for session %s", session_id)
             return
 
+        if msg.get("type") == "clear_longterm":
+            req = ClearLongtermMsg.model_validate(msg)
+            session_id = req.session_id or "server"
+            await asyncio.to_thread(memory.clear_longterm, session_id)
+            log.info("cleared long-term memory for session %s", session_id)
+            return
+
         req = QueryMsg.model_validate(msg)
         player_id = req.player
-        session_id = req.session_id or str(player_id)
+        session_id = req.session_id or "server"
         prompt = req.prompt
         plugin_name = req.plugin
         plugin_context = req.system
         skill_names = req.skills
 
         if not prompt:
-            await _send({"type": "response", "text": "(empty prompt)"})
+            await _send({"type": "response", "text": "(empty prompt)", "status": "error"})
             await _send({"type": "done"})
             return
 
-        # Prefetch both memory tiers concurrently while building tool list.
-        memory_task = asyncio.create_task(asyncio.to_thread(memory.get, session_id))
-        longterm_task = asyncio.create_task(asyncio.to_thread(memory.get_longterm, session_id))
+        # Prefetch memory concurrently while building tool list (skipped for no_memory queries).
+        if not req.no_memory:
+            memory_task = asyncio.create_task(asyncio.to_thread(memory.get, session_id))
+            longterm_task = asyncio.create_task(asyncio.to_thread(memory.get_longterm, session_id))
 
         session_data: dict = {}
         plugin_tools = [
@@ -117,8 +159,12 @@ async def handle(
             if t.name and t.description
         ]
 
-        player_history = await memory_task
-        longterm = await longterm_task
+        if req.no_memory:
+            player_history: list = []
+            longterm = ""
+        else:
+            player_history = await memory_task
+            longterm = await longterm_task
 
         full_system = _build_system_prompt(plugin_name, plugin_context, longterm)
 
@@ -134,16 +180,19 @@ async def handle(
                 log.warning("failed to load plugin skills %s: %s", skill_names, exc)
 
         agent_kwargs: dict = {
+            "name": "amxmodx-genai",
             "model": get_model(),
             "system_prompt": full_system,
             "tools": plugin_tools + (native_tools if settings.model_backend != "ollama" else []),
             "messages": player_history,
+            "callback_handler": None,
+            "hooks": [_RetryHook()],
         }
         if plugins:
             agent_kwargs["plugins"] = plugins
 
         timeout = settings.request_timeout_seconds or None
-        result = await asyncio.wait_for(_invoke_with_retry(agent_kwargs, prompt), timeout=timeout)
+        result = await asyncio.wait_for(Agent(**agent_kwargs).invoke_async(prompt), timeout=timeout)
 
         final_text = ""
         result_msg = getattr(result, "message", None)
@@ -165,19 +214,29 @@ async def handle(
             log.warning("agent returned no text for session=%s", session_id)
             clean_text = "(no response)"
 
-        await asyncio.to_thread(memory.update, session_id, prompt, clean_text)
+        if not req.no_memory:
+            await asyncio.to_thread(memory.update, session_id, prompt, clean_text)
 
-        await _send({"type": "response", "text": clean_text})
+        await _send({"type": "response", "text": clean_text, "status": "ok"})
         await _send({"type": "done"})
 
+        metrics = getattr(result, "metrics", None)
+        usage = getattr(metrics, "accumulated_usage", {}) if metrics else {}
         log.info(
-            "session=%s player=%d tools_called=%d response_len=%d",
+            "session=%s player=%d tools_called=%d response_len=%d tokens=%d",
             session_id,
             player_id,
             len(session_data.get("calls", [])),
             len(clean_text),
+            usage.get("totalTokens", 0),
         )
 
+    except MaxTokensReachedException:
+        log.warning("max tokens reached (request_id=%s)", request_id)
+        await _safe_send_error(_send, "(response too long)")
+    except ContextWindowOverflowException:
+        log.warning("context window overflow (request_id=%s)", request_id)
+        await _safe_send_error(_send, "(conversation too long, try clearing memory)")
     except TimeoutError:
         log.warning("request timed out (request_id=%s)", request_id)
         await _safe_send_error(_send, "(request timed out)")
@@ -189,29 +248,28 @@ async def handle(
         await _safe_send_error(_send, "(AI unavailable)")
 
 
-async def _invoke_with_retry(agent_kwargs: dict, prompt: str):
-    """Invoke a fresh agent with one retry on failure."""
-    last_exc: Exception | None = None
-    for attempt in range(_MAX_RETRIES + 1):
-        try:
-            return await Agent(**agent_kwargs).invoke_async(prompt)
-        except Exception as exc:
-            last_exc = exc
-            if attempt < _MAX_RETRIES:
-                log.warning("invoke attempt %d failed (%s), retrying", attempt + 1, exc)
-                await asyncio.sleep(1.0)
-    raise last_exc  # type: ignore[misc]
+def _build_system_prompt(
+    plugin_name: str, plugin_context: str, longterm: str = ""
+) -> list[SystemContentBlock]:
+    """Build the system prompt as a SystemContentBlock list with a cache point.
 
-
-def _build_system_prompt(plugin_name: str, plugin_context: str, longterm: str = "") -> str:
-    """Build the complete system prompt from base, plugin context, and long-term memory."""
-    parts = [_BASE_SYSTEM_PROMPT]
-    if longterm:
-        parts.append(f"\n## Memory from previous sessions\n\n{longterm}")
+    Static content (base prompt + plugin context) sits before the cache point so
+    Anthropic can cache it across requests from the same plugin. Dynamic content
+    (long-term memory) goes after the cache point so it never invalidates the cache.
+    Other backends accept list[SystemContentBlock] and ignore the cachePoint entry.
+    """
+    static = _BASE_SYSTEM_PROMPT
     if plugin_context:
         heading = f"## {plugin_name}" if plugin_name else "## Plugin context"
-        parts.append(f"\n{heading}\n\n{_shift_headings(plugin_context)}")
-    return "".join(parts)
+        static += f"\n{heading}\n\n{_shift_headings(plugin_context)}"
+
+    blocks: list[SystemContentBlock] = [
+        SystemContentBlock(text=static),
+        SystemContentBlock(cachePoint={"type": "default"}),
+    ]
+    if longterm:
+        blocks.append(SystemContentBlock(text=f"\n## Memory from previous sessions\n\n{longterm}"))
+    return blocks
 
 
 def _shift_headings(text: str) -> str:
@@ -231,5 +289,5 @@ def _shift_headings(text: str) -> str:
 
 async def _safe_send_error(send: _Send, text: str) -> None:
     with contextlib.suppress(Exception):
-        await send({"type": "response", "text": text})
+        await send({"type": "response", "text": text, "status": "error"})
         await send({"type": "done"})

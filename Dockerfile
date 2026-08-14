@@ -5,7 +5,7 @@ WORKDIR /app
 RUN pip install uv
 
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --extra ollama --dev
+RUN uv sync --dev
 
 COPY src/ src/
 COPY tests/ tests/

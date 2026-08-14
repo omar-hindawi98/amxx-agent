@@ -8,29 +8,62 @@
     #pragma loadlib amxmodx_genai
 #endif
 
+// ---- Natives ----------------------------------------------------------------
+
 /**
- * Sends a prompt to the agent. The response is delivered asynchronously to
- * the named callback in the calling plugin.
+ * Sends a prompt scoped to this player's memory.
+ *
+ * The session key is the player's SteamID so memory survives reconnects and
+ * map changes.
  *
  * Callback signature:
- *   public MyCallback(player, const response[])
+ *   public MyCallback(player, const response[], bool:is_error)
  *
- * @param player      Client index used for callback routing (0 = server context)
- * @param prompt      User message to send
- * @param callback    Name of public function in calling plugin to receive response
- * @param session_id  Optional. Conversation history key. Defaults to the player
- *                    index string when empty. Use a custom string to share history
- *                    across players (e.g. "ct_team") or create named sessions
- *                    independent of any player (e.g. "round_debrief").
- * @return            Queue slot on success, -1 if queue is full or socket error
+ * is_error is true when the response is a sidecar error (timeout, unauthorized,
+ * AI unavailable) rather than a real AI reply.
+ *
+ * @param player       Client index
+ * @param prompt       User message to send
+ * @param callback     Name of public function in calling plugin to receive response
+ * @param this_plugin  Optional. When true, memory is isolated to this plugin only.
+ *                     When false (default), memory is shared across all plugins for
+ *                     the same player. Use true when your plugin has a distinct
+ *                     persona that should not bleed into the player's shared history.
+ * @param no_memory    Optional. When true the query runs with no history and the
+ *                     response is not stored. Use for one-off lookups (stat queries,
+ *                     admin commands) that should not pollute the session.
+ * @return             Queue slot on success, -1 if queue is full or socket error
  */
-native genai_query(player, const prompt[], const callback[], const session_id[] = "");
+native genai_query_player(player, const prompt[], const callback[], bool:this_plugin = false, bool:no_memory = false);
+
+/**
+ * Sends a prompt with an explicit session key. Use for custom scopes:
+ *   - Team/group sessions:  "team_2", "ct_squad"
+ *   - Server-wide session:  "server"
+ *   - Any other shared context
+ *
+ * All callers that pass the same session_id share the same memory.
+ *
+ * Callback signature:
+ *   public MyCallback(const response[], bool:is_error)
+ *
+ * is_error is true when the response is a sidecar error rather than a real AI reply.
+ *
+ * @param prompt       User message to send
+ * @param callback     Name of public function in calling plugin to receive response
+ * @param session_id   Conversation history key. Must be non-empty.
+ * @param this_plugin  Optional. When true, session_id is prefixed with this plugin's
+ *                     name so two plugins using "team_2" don't share the same memory.
+ * @param no_memory    Optional. See genai_query_player.
+ * @return             Queue slot on success, -1 if queue is full or socket error
+ */
+native genai_query(const prompt[], const callback[], const session_id[], bool:this_plugin = false, bool:no_memory = false);
 
 /**
  * Cancels any pending query for this player / session. No callback is fired.
  *
  * @param player      Client index
- * @param session_id  Optional. Session to cancel. Defaults to player index string.
+ * @param session_id  Optional. Session to cancel. Defaults to player SteamID.
  */
 native genai_cancel(player, const session_id[] = "");
 
@@ -38,7 +71,7 @@ native genai_cancel(player, const session_id[] = "");
  * Returns true if a query is currently pending for this player / session.
  *
  * @param player      Client index
- * @param session_id  Optional. Session to check. Defaults to player index string.
+ * @param session_id  Optional. Session to check. Defaults to player SteamID.
  */
 native bool:genai_is_pending(player, const session_id[] = "");
 
@@ -66,7 +99,7 @@ native genai_append_plugin_context(const content[]);
  * Call on player disconnect or when starting a new context.
  *
  * @param player      Client index (for server-side reference)
- * @param session_id  Optional. Session to clear. Defaults to player index string.
+ * @param session_id  Optional. Session to clear. Defaults to player SteamID.
  */
 native genai_clear_memory(player, const session_id[] = "");
 
@@ -117,3 +150,13 @@ native genai_add_tool_param(const name[], const type[], bool:required, const des
  * @param callback    Name of public function in calling plugin
  */
 native genai_register_tool(const name[], const description[], const callback[]);
+
+/**
+ * Clears long-term (summary) memory for a session without touching short-term memory.
+ * Use when you want to wipe a player's persistent AI memory completely, e.g. season reset.
+ * Unlike genai_clear_memory, this does NOT trigger summarization - it discards the summary.
+ *
+ * @param player      Client index
+ * @param session_id  Optional. Session to clear. Defaults to player SteamID.
+ */
+native genai_clear_longterm_memory(player, const session_id[] = "");

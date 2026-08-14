@@ -83,15 +83,14 @@ def make_plugin_tool(
 
     else:
 
+        @tool
         async def _fn(args: str = "{}") -> str:  # type: ignore[misc]
             return await _call(name, args, send, tool_result_queue, request_id, session_data)
 
     _fn.__name__ = name
     _fn.__doc__ = description
 
-    if validated:
-        return _fn
-    return tool(_fn)
+    return _fn
 
 
 async def _call(

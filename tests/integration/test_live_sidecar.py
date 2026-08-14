@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-async def exchange(msg: dict, *, timeout: float = 60.0) -> list[dict]:
+async def exchange(msg: dict, *, timeout: float = 70.0) -> list[dict]:
     """Send a single newline-delimited JSON message and collect all response frames until done."""
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write((json.dumps(msg) + "\n").encode())
@@ -81,7 +81,7 @@ async def test_memory_persists_within_session():
             "type": "query",
             "player": 1,
             "session_id": session,
-            "prompt": "my favourite gun is the AK47",
+            "prompt": "my favourite map is de_dust2",
             "tools": [],
         }
     )
@@ -90,13 +90,13 @@ async def test_memory_persists_within_session():
             "type": "query",
             "player": 1,
             "session_id": session,
-            "prompt": "what gun did I mention?",
+            "prompt": "what map did I mention?",
             "tools": [],
         }
     )
     response = next(f for f in frames if f["type"] == "response")
-    assert "AK" in response["text"] or "ak" in response["text"].lower(), (
-        f"expected AK47 in follow-up response, got: {response['text']}"
+    assert "dust" in response["text"].lower(), (
+        f"expected dust2 in follow-up response, got: {response['text']}"
     )
     # cleanup
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)

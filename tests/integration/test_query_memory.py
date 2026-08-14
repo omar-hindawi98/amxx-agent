@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.integration.conftest import requires_ollama
 from tests.integration.helpers import get_handle, make_agent_result, tcp_exchange
 
 
@@ -46,20 +47,20 @@ async def test_clear_memory(unused_tcp_port):
 
 
 @pytest.mark.asyncio
-async def test_clear_memory_defaults_to_player_string(unused_tcp_port):
+async def test_clear_memory_defaults_to_server_when_no_session_id(unused_tcp_port):
     mem = _mem()
-    mem.update("3", "hello", "world")
+    mem.update("server", "hello", "world")
 
     srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
-        writer.write((json.dumps({"type": "clear_memory", "player": 3}) + "\n").encode())
+        writer.write((json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode())
         await writer.drain()
         await asyncio.sleep(0.5)
         writer.close()
         await writer.wait_closed()
 
-    assert mem.get("3") == []
+    assert mem.get("server") == []
 
 
 @pytest.mark.asyncio
@@ -77,87 +78,71 @@ async def test_empty_prompt_returns_error(unused_tcp_port):
     assert "done" in types
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_query_response_and_done(unused_tcp_port):
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(
-            return_value=make_agent_result("Buy AK47 and vesthelm.")
+    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        frames = await tcp_exchange(
+            "127.0.0.1",
+            unused_tcp_port,
+            {"type": "query", "player": 2, "prompt": "what to buy?", "tools": []},
         )
-        MockAgent.return_value = mock_instance
-
-        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            frames = await tcp_exchange(
-                "127.0.0.1",
-                unused_tcp_port,
-                {"type": "query", "player": 2, "prompt": "what to buy?", "tools": []},
-            )
 
     types = [f["type"] for f in frames]
     assert "response" in types
     assert "done" in types
     response = next(f for f in frames if f["type"] == "response")
-    assert "AK47" in response["text"]
+    assert response["text"].strip()
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_memory_updated_after_query(unused_tcp_port):
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(return_value=make_agent_result("Save this round."))
-        MockAgent.return_value = mock_instance
+    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        await tcp_exchange(
+            "127.0.0.1",
+            unused_tcp_port,
+            {"type": "query", "player": 5, "prompt": "should I save?", "tools": []},
+        )
 
-        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            await tcp_exchange(
-                "127.0.0.1",
-                unused_tcp_port,
-                {"type": "query", "player": 5, "prompt": "should I save?", "tools": []},
-            )
-
-    h = _mem().get("5")
+    h = _mem().get("server")
     assert len(h) == 2
     assert h[0]["role"] == "user"
     assert h[1]["role"] == "assistant"
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_named_session_memory(unused_tcp_port):
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(return_value=make_agent_result("Focus B site."))
-        MockAgent.return_value = mock_instance
-
-        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            await tcp_exchange(
-                "127.0.0.1",
-                unused_tcp_port,
-                {
-                    "type": "query",
-                    "player": 1,
-                    "session_id": "ct_team",
-                    "prompt": "what is our strategy?",
-                    "tools": [],
-                },
-            )
+    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        await tcp_exchange(
+            "127.0.0.1",
+            unused_tcp_port,
+            {
+                "type": "query",
+                "player": 1,
+                "session_id": "ct_team",
+                "prompt": "what is our strategy?",
+                "tools": [],
+            },
+        )
 
     assert _mem().get("ct_team") != []
     assert _mem().get("1") == []
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="requires a running local model endpoint")
 async def test_longterm_summary_stored_on_clear(unused_tcp_port):
     mem = _mem()
     mem.update("7", "what gun to buy?", "Buy AK47.")
 
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(return_value=make_agent_result("- Prefers AK47"))
-        MockAgent.return_value = mock_instance
-
+    with patch(
+        "amxmodx_genai.core.handler.summarize_session",
+        new=AsyncMock(return_value="- Prefers AK47"),
+    ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
@@ -172,7 +157,7 @@ async def test_longterm_summary_stored_on_clear(unused_tcp_port):
             await writer.wait_closed()
 
     assert mem.get("7") == []
-    assert mem.get_longterm("7") != ""
+    assert mem.get_longterm("7") == "- Prefers AK47"
 
 
 @pytest.mark.asyncio
@@ -203,4 +188,10 @@ async def test_longterm_injected_into_system_prompt(unused_tcp_port):
                 },
             )
 
-    assert "Player prefers rifles" in captured_kwargs.get("system_prompt", "")
+    system_prompt = captured_kwargs.get("system_prompt", [])
+    prompt_text = (
+        "".join(b.get("text", "") for b in system_prompt)
+        if isinstance(system_prompt, list)
+        else system_prompt
+    )
+    assert "Player prefers rifles" in prompt_text

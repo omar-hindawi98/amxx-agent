@@ -14,6 +14,8 @@ new g_szQueueCallback[MAX_QUEUE][MAX_CALLBACK];
 new g_szQueuePlugin[MAX_QUEUE][MAX_PLUGIN_NAME];
 new g_szQueueResponse[MAX_QUEUE][MAX_RESPONSE];
 new bool:g_bQueueUsed[MAX_QUEUE];
+new bool:g_bQueueError[MAX_QUEUE];    // true when the sidecar sent status="error" for this slot
+new bool:g_bQueueNoPlayer[MAX_QUEUE]; // true for genai_query: callback is (response[]) not (player, response[])
 
 // ---- persistent connection state --------------------------------------------
 
@@ -79,6 +81,8 @@ stock find_slot_by_request_id(const request_id[])
 stock free_slot(slot)
 {
     g_bQueueUsed[slot]          = false;
+    g_bQueueError[slot]         = false;
+    g_bQueueNoPlayer[slot]      = false;
     g_szQueueResponse[slot][0]  = 0;
     g_szQueueSessionId[slot][0] = 0;
     g_szQueueRequestId[slot][0] = 0;

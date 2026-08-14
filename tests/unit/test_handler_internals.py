@@ -68,52 +68,87 @@ def test_shift_headings_multiline():
 # ---------------------------------------------------------------------------
 
 
+def _prompt_text(blocks: list) -> str:
+    """Concatenate text from all SystemContentBlock entries."""
+    return "".join(b.get("text", "") for b in blocks)
+
+
+def test_build_system_prompt_returns_list():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "")
+    assert isinstance(result, list)
+
+
+def test_build_system_prompt_has_cache_point():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "")
+    assert any("cachePoint" in b for b in result)
+
+
 def test_build_system_prompt_base_only():
     h = _get_handler()
     result = h._build_system_prompt("", "", "")
-    assert result == h._BASE_SYSTEM_PROMPT
+    assert h._BASE_SYSTEM_PROMPT in _prompt_text(result)
 
 
 def test_build_system_prompt_with_longterm():
     h = _get_handler()
     result = h._build_system_prompt("", "", "- Player prefers rifles")
-    assert "Memory from previous sessions" in result
-    assert "Player prefers rifles" in result
+    text = _prompt_text(result)
+    assert "Memory from previous sessions" in text
+    assert "Player prefers rifles" in text
+
+
+def test_build_system_prompt_longterm_after_cache_point():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "some memory")
+    cache_idx = next(i for i, b in enumerate(result) if "cachePoint" in b)
+    longterm_idx = next(i for i, b in enumerate(result) if "Memory" in b.get("text", ""))
+    assert longterm_idx > cache_idx
+
+
+def test_build_system_prompt_no_longterm_block_when_empty():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "")
+    assert not any("Memory" in b.get("text", "") for b in result)
 
 
 def test_build_system_prompt_with_plugin_context():
     h = _get_handler()
     result = h._build_system_prompt("myplugin", "# Rules\nDo stuff", "")
-    assert "## myplugin" in result
-    assert "### Rules" in result
-    assert "Do stuff" in result
+    text = _prompt_text(result)
+    assert "## myplugin" in text
+    assert "### Rules" in text
+    assert "Do stuff" in text
 
 
 def test_build_system_prompt_unnamed_plugin():
     h = _get_handler()
     result = h._build_system_prompt("", "Some context", "")
-    assert "## Plugin context" in result
-    assert "Some context" in result
+    text = _prompt_text(result)
+    assert "## Plugin context" in text
+    assert "Some context" in text
 
 
 def test_build_system_prompt_all_three():
     h = _get_handler()
     result = h._build_system_prompt("myplugin", "# Rules", "- fact")
-    assert "Memory from previous sessions" in result
-    assert "- fact" in result
-    assert "## myplugin" in result
-    assert "### Rules" in result
+    text = _prompt_text(result)
+    assert "Memory from previous sessions" in text
+    assert "- fact" in text
+    assert "## myplugin" in text
+    assert "### Rules" in text
 
 
 def test_build_system_prompt_plugin_headings_nested():
     # Headings inside plugin_context must be shifted so they sit below ## plugin
     h = _get_handler()
     result = h._build_system_prompt("p", "# Top\n## Sub", "")
-    assert "### Top" in result
-    assert "#### Sub" in result
-    # Original bare heading chars should not appear at those levels
-    assert "\n# Top" not in result
-    assert "\n## Sub" not in result
+    text = _prompt_text(result)
+    assert "### Top" in text
+    assert "#### Sub" in text
+    assert "\n# Top" not in text
+    assert "\n## Sub" not in text
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +269,7 @@ async def test_dict_content_block_text_extracted(unused_tcp_port):
 
     response = next(f for f in frames if f["type"] == "response")
     assert response["text"] == "dict response"
+    assert response["status"] == "ok"
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +342,34 @@ async def test_clear_memory_longterm_not_updated_when_summarization_fails(unused
     # Short-term cleared but long-term unchanged
     assert mem.get("100") == []
     assert mem.get_longterm("100") == "existing summary"
+
+
+@pytest.mark.asyncio
+async def test_clear_longterm_removes_longterm_memory(unused_tcp_port):
+    """clear_longterm message deletes the long-term summary without touching short-term memory."""
+    import amxmodx_genai.core.memory as mem
+
+    mem.update("lt1", "hello", "world")
+    mem.set_longterm("lt1", "summary to be deleted")
+
+    from amxmodx_genai.server import handle_once
+
+    srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
+    async with srv:
+        reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
+        writer.write(
+            (
+                json.dumps({"type": "clear_longterm", "player": 1, "session_id": "lt1"}) + "\n"
+            ).encode()
+        )
+        await writer.drain()
+        await asyncio.sleep(0.3)
+        writer.close()
+        await writer.wait_closed()
+
+    # Short-term memory untouched; long-term wiped.
+    assert mem.get("lt1") != []
+    assert mem.get_longterm("lt1") == ""
 
 
 # ---------------------------------------------------------------------------
@@ -524,6 +588,7 @@ async def test_auth_token_rejected_when_missing(unused_tcp_port):
 
     response = next(f for f in frames if f["type"] == "response")
     assert "unauthorized" in response["text"].lower()
+    assert response["status"] == "error"
 
 
 @pytest.mark.asyncio
@@ -652,6 +717,196 @@ async def test_request_timeout_returns_error(unused_tcp_port):
 
     response = next(f for f in frames if f["type"] == "response")
     assert "timed out" in response["text"].lower()
+    assert response["status"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# no_memory: memory is not read or written when flag is set
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_no_memory_query_skips_memory_read(unused_tcp_port):
+    """When no_memory=true, memory.get and memory.get_longterm are never called."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ephemeral reply"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            frames = await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "lookup", "tools": [], "no_memory": True},
+            )
+
+    mock_mem.get.assert_not_called()
+    mock_mem.get_longterm.assert_not_called()
+    assert any(f["type"] == "response" for f in frames)
+
+
+@pytest.mark.asyncio
+async def test_no_memory_query_skips_memory_write(unused_tcp_port):
+    """When no_memory=true, memory.update is never called after the response."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ephemeral reply"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "lookup", "tools": [], "no_memory": True},
+            )
+
+    mock_mem.update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_normal_query_does_write_memory(unused_tcp_port):
+    """Sanity: memory.update IS called for a normal (no_memory=false) query."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("stored reply"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 1, "prompt": "remember this", "tools": []},
+            )
+
+    mock_mem.update.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# session_id fallback: empty session_id uses "server" not str(player)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_empty_session_id_defaults_to_server(unused_tcp_port):
+    """A query with no session_id uses 'server' as the memory key."""
+    from tests.integration.helpers import get_handle, tcp_exchange
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
+        return inst
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+    ):
+        mock_mem.get.return_value = []
+        mock_mem.get_longterm.return_value = ""
+        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await tcp_exchange(
+                "127.0.0.1",
+                unused_tcp_port,
+                {"type": "query", "player": 5, "prompt": "hello", "tools": []},
+                # no session_id field
+            )
+
+    mock_mem.get.assert_called_once_with("server")
+    mock_mem.update.assert_called_once()
+    call_args = mock_mem.update.call_args
+    assert call_args[0][0] == "server"
+
+
+# ---------------------------------------------------------------------------
+# _RetryHook: retries on AfterModelCallEvent exceptions, stops on unrecoverable
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_sets_retry_on_transient_error():
+    """_RetryHook sets event.retry=True for a transient exception."""
+    from unittest.mock import MagicMock
+
+    from amxmodx_genai.core.handler import _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = RuntimeError("transient")
+    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+        await hook._maybe_retry(event)
+    assert event.retry is True
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_stops_after_max_retries():
+    """_RetryHook does not set retry after _MAX_HOOK_RETRIES attempts."""
+    from amxmodx_genai.core.handler import _MAX_HOOK_RETRIES, _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = RuntimeError("persistent")
+    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+        for _ in range(_MAX_HOOK_RETRIES):
+            await hook._maybe_retry(event)
+        event.retry = False
+        await hook._maybe_retry(event)
+    assert event.retry is False
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_does_not_retry_unrecoverable():
+    """_RetryHook does not set retry for MaxTokensReachedException."""
+    from strands.types.exceptions import MaxTokensReachedException
+
+    from amxmodx_genai.core.handler import _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = MaxTokensReachedException("too long")
+    event.retry = False
+    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+        await hook._maybe_retry(event)
+    assert event.retry is False
+
+
+@pytest.mark.asyncio
+async def test_retry_hook_no_op_when_no_exception():
+    """_RetryHook does not touch event.retry when exception is None."""
+    from amxmodx_genai.core.handler import _RetryHook
+
+    hook = _RetryHook()
+    event = MagicMock()
+    event.exception = None
+    event.retry = False
+    await hook._maybe_retry(event)
+    assert event.retry is False
 
 
 async def _send_single(host: str, port: int, label: str) -> list[dict]:

@@ -8,6 +8,7 @@ import signal
 from typing import Any
 
 from amxmodx_genai.config import settings
+from amxmodx_genai.core import memory
 from amxmodx_genai.core.handler import handle
 from amxmodx_genai.core.model import validate as validate_model
 from amxmodx_genai.core.protocol import send_json
@@ -34,6 +35,8 @@ async def _handle_persistent(
     write_lock = asyncio.Lock()
     # Maps request_id -> Queue where tool_result frames are delivered.
     result_queues: dict[str, asyncio.Queue] = {}
+    # One semaphore per session_id so one session's queued requests never starve others.
+    session_sems: dict[str, asyncio.Semaphore] = {}
     in_flight: set[asyncio.Task] = set()
 
     async def send(obj: dict[str, Any]) -> None:
@@ -67,11 +70,15 @@ async def _handle_persistent(
                         addr,
                     )
 
-            elif msg_type in ("query", "clear_memory"):
+            elif msg_type in ("query", "clear_memory", "clear_longterm"):
                 q: asyncio.Queue = asyncio.Queue()
                 result_queues[request_id] = q
+                session_id = msg.get("session_id") or str(msg.get("player", ""))
+                session_sem = session_sems.setdefault(
+                    session_id, asyncio.Semaphore(settings.session_concurrency)
+                )
                 task = asyncio.create_task(
-                    _bounded_handle(msg, send, q),
+                    _bounded_handle(msg, send, q, session_sem),
                     name=f"handle-{request_id}",
                 )
                 in_flight.add(task)
@@ -85,7 +92,12 @@ async def _handle_persistent(
             else:
                 log.warning("unknown message type %r from %s", msg_type, addr)
                 await send(
-                    {"type": "response", "text": "(unknown request type)", "request_id": request_id}
+                    {
+                        "type": "response",
+                        "text": "(unknown request type)",
+                        "status": "error",
+                        "request_id": request_id,
+                    }
                 )
                 await send({"type": "done", "request_id": request_id})
 
@@ -132,7 +144,7 @@ async def handle_once(
         return
 
     q: asyncio.Queue = asyncio.Queue()
-    await _bounded_handle(msg, send, q)
+    await _bounded_handle(msg, send, q, asyncio.Semaphore(1))
 
     writer.close()
     with contextlib.suppress(Exception):
@@ -143,9 +155,10 @@ async def _bounded_handle(
     msg: dict[str, Any],
     send: Any,
     tool_result_queue: asyncio.Queue,
+    session_sem: asyncio.Semaphore,
 ) -> None:
     assert _sem is not None
-    async with _sem:
+    async with session_sem, _sem:
         await handle(msg, send, tool_result_queue)
 
 
@@ -160,6 +173,22 @@ async def _track(coro: Any) -> None:
             _active_tasks.discard(task)
 
 
+async def _vacuum_loop() -> None:
+    """Periodically remove sessions inactive beyond GENAI_MEMORY_SESSION_TTL_DAYS."""
+    while True:
+        await asyncio.sleep(3600)
+        try:
+            removed = await asyncio.to_thread(memory.vacuum, settings.memory_session_ttl_days)
+            if removed:
+                log.info(
+                    "vacuumed %d stale sessions (ttl=%d days)",
+                    removed,
+                    settings.memory_session_ttl_days,
+                )
+        except Exception as exc:
+            log.warning("vacuum failed: %s", exc)
+
+
 async def serve() -> None:
     """Start the GenAI TCP server and listen indefinitely."""
     global _sem
@@ -169,6 +198,10 @@ async def serve() -> None:
         log.warning("skills path does not exist: %s", settings.skills_path)
 
     _sem = asyncio.Semaphore(settings.max_concurrent)
+
+    if settings.memory_session_ttl_days > 0:
+        asyncio.create_task(_vacuum_loop(), name="vacuum")
+        log.info("session vacuum enabled (ttl=%d days)", settings.memory_session_ttl_days)
 
     async def _handler(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
         await _track(_handle_persistent(r, w))

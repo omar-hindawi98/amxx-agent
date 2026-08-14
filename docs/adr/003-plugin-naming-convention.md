@@ -19,6 +19,13 @@ Both `genai_register_tool` and `genai_register_skill` automatically prefix the r
 
 The SKILL.md `name` field must match the directory name, which uses the same prefixed form.
 
+## Alternatives Considered
+
+- **Manual prefixes by plugin authors** - flexible but error-prone; relies on authors knowing what other plugins exist and consistently applying a convention.
+- **Global registry with collision detection** - fails loudly on duplicate names, forcing plugin authors to coordinate across unrelated plugins; adds runtime error paths.
+- **UUID-based tool IDs** - collision-proof but opaque; the agent sees meaningless names and cannot use them meaningfully in reasoning.
+- **Namespaced objects per plugin** - keeps each plugin's tools isolated but requires a more complex API surface and changes how the agent addresses tools.
+
 ## Consequences
 
 - Plugin authors never think about namespacing; collisions are structurally impossible.

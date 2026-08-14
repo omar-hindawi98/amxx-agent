@@ -7,8 +7,8 @@
 #define MAX_CALLBACK    64
 #define MAX_PLUGIN_NAME 64
 #define MAX_SESSION_ID  64
-#define MAX_PROMPT      1024
-#define MAX_SYSTEM      2048
+#define MAX_PROMPT      8192
+#define MAX_SYSTEM      8192
 #define MAX_RESPONSE    4096
 #define MAX_TOOLS            32
 #define MAX_TOOL_NAME        64
