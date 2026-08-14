@@ -15,6 +15,10 @@ dependencies = [
 ]
 
 
+[project.urls]
+repository = "https://github.com/omar-hindawi98/amxmodx-genai"
+homepage = "https://github.com/omar-hindawi98/amxmodx-genai"
+
 [project.scripts]
 genai-sidecar = "amxmodx_genai.server:serve_cli"
 
