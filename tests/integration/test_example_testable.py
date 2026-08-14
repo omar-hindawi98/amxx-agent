@@ -23,7 +23,6 @@ import pytest
 
 from tests.integration.helpers import make_agent_result
 
-
 _SESSION = "testable__plugin"
 
 _TOOLS = [
@@ -36,15 +35,30 @@ _TOOLS = [
         "name": "set_value",
         "description": "Stores a named value in the plugin's key-value store.",
         "params": [
-            {"name": "key",   "type": "string", "required": True,  "description": "Storage key"},
-            {"name": "value", "type": "string", "required": True,  "description": "Value to store"},
+            {
+                "name": "key",
+                "type": "string",
+                "required": True,
+                "description": "Storage key",
+            },
+            {
+                "name": "value",
+                "type": "string",
+                "required": True,
+                "description": "Value to store",
+            },
         ],
     },
     {
         "name": "get_value",
         "description": "Retrieves a value from the plugin's key-value store.",
         "params": [
-            {"name": "key", "type": "string", "required": True, "description": "Storage key to look up"},
+            {
+                "name": "key",
+                "type": "string",
+                "required": True,
+                "description": "Storage key to look up",
+            },
         ],
     },
 ]
@@ -95,12 +109,17 @@ async def _exchange(
         if frame.get("type") == "tool_call" and frame.get("request_id") == request_id:
             content = tool_responses.get(frame.get("name", ""), '{"error":"unknown tool"}')
             writer.write(
-                (json.dumps({
-                    "type": "tool_result",
-                    "request_id": request_id,
-                    "id": frame["id"],
-                    "content": content,
-                }) + "\n").encode()
+                (
+                    json.dumps(
+                        {
+                            "type": "tool_result",
+                            "request_id": request_id,
+                            "id": frame["id"],
+                            "content": content,
+                        }
+                    )
+                    + "\n"
+                ).encode()
             )
             await writer.drain()
 
@@ -120,7 +139,6 @@ async def _exchange(
 @pytest.mark.asyncio
 async def test_set_value_args_forwarded(unused_tcp_port):
     """set_value receives the key and value the AI intended to store."""
-    received_args: list[dict] = []
 
     def make_agent(**kwargs):
         inst = MagicMock()
@@ -134,8 +152,6 @@ async def test_set_value_args_forwarded(unused_tcp_port):
         return inst
 
     # Capture the raw args_json that the tool function receives via the wire.
-    original_run = None
-
     with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -332,12 +348,17 @@ async def test_clear_memory_resets_session(unused_tcp_port):
             # Send clear_memory as the plugin would.
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
-                (json.dumps({
-                    "type": "clear_memory",
-                    "request_id": "cm1",
-                    "player": 0,
-                    "session_id": _SESSION,
-                }) + "\n").encode()
+                (
+                    json.dumps(
+                        {
+                            "type": "clear_memory",
+                            "request_id": "cm1",
+                            "player": 0,
+                            "session_id": _SESSION,
+                        }
+                    )
+                    + "\n"
+                ).encode()
             )
             await writer.drain()
             await asyncio.sleep(0.3)
@@ -365,8 +386,12 @@ async def test_sessions_are_isolated(unused_tcp_port):
     with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
-            await _exchange(unused_tcp_port, "session A message", "r1", {}, session_id="testable__a")
-            await _exchange(unused_tcp_port, "session B message", "r2", {}, session_id="testable__b")
+            await _exchange(
+                unused_tcp_port, "session A message", "r1", {}, session_id="testable__a"
+            )
+            await _exchange(
+                unused_tcp_port, "session B message", "r2", {}, session_id="testable__b"
+            )
 
     assert len(mem.get("testable__a")) == 2
     assert len(mem.get("testable__b")) == 2
