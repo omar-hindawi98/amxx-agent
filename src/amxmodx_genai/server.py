@@ -8,6 +8,7 @@ import signal
 from typing import Any
 
 from amxmodx_genai.config import settings
+from amxmodx_genai.core import memory
 from amxmodx_genai.core.handler import handle
 from amxmodx_genai.core.model import validate as validate_model
 from amxmodx_genai.core.protocol import send_json
@@ -73,7 +74,9 @@ async def _handle_persistent(
                 q: asyncio.Queue = asyncio.Queue()
                 result_queues[request_id] = q
                 session_id = msg.get("session_id") or str(msg.get("player", ""))
-                session_sem = session_sems.setdefault(session_id, asyncio.Semaphore(1))
+                session_sem = session_sems.setdefault(
+                    session_id, asyncio.Semaphore(settings.session_concurrency)
+                )
                 task = asyncio.create_task(
                     _bounded_handle(msg, send, q, session_sem),
                     name=f"handle-{request_id}",
@@ -166,6 +169,18 @@ async def _track(coro: Any) -> None:
             _active_tasks.discard(task)
 
 
+async def _vacuum_loop() -> None:
+    """Periodically remove sessions inactive beyond GENAI_MEMORY_SESSION_TTL_DAYS."""
+    while True:
+        await asyncio.sleep(3600)
+        try:
+            removed = await asyncio.to_thread(memory.vacuum, settings.memory_session_ttl_days)
+            if removed:
+                log.info("vacuumed %d stale sessions (ttl=%d days)", removed, settings.memory_session_ttl_days)
+        except Exception as exc:
+            log.warning("vacuum failed: %s", exc)
+
+
 async def serve() -> None:
     """Start the GenAI TCP server and listen indefinitely."""
     global _sem
@@ -175,6 +190,10 @@ async def serve() -> None:
         log.warning("skills path does not exist: %s", settings.skills_path)
 
     _sem = asyncio.Semaphore(settings.max_concurrent)
+
+    if settings.memory_session_ttl_days > 0:
+        asyncio.create_task(_vacuum_loop(), name="vacuum")
+        log.info("session vacuum enabled (ttl=%d days)", settings.memory_session_ttl_days)
 
     async def _handler(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
         await _track(_handle_persistent(r, w))

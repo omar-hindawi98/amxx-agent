@@ -48,6 +48,7 @@ Each message includes a `request_id` to correlate requests with their responses.
   "prompt": "what should we do this round?",
   "system": "You are a team assistant. Keep answers brief.",
   "auth_token": "mysecret",
+  "no_memory": false,
   "tools": [
     {
       "name": "my_plugin__get_score",
@@ -62,12 +63,13 @@ Each message includes a `request_id` to correlate requests with their responses.
 | Field | Type | Description |
 |-------|------|-------------|
 | `request_id` | string | Unique request identifier for multiplexing responses to requests over the persistent connection |
-| `player` | int | AMX Mod X client index used for callback routing (0 = server context) |
-| `session_id` | string | Memory key. Defaults to player's SteamID (via `get_user_authid`) when absent or empty. Falls back to `str(player)` for bots and LAN clients without a SteamID. Max 256 characters. |
+| `player` | int | AMX Mod X client index used for callback routing. `0` for session-scoped queries (`genai_query`) where no specific player is targeted. |
+| `session_id` | string | Memory key. The Pawn API always sends a non-empty value: SteamID for player-scoped queries, an explicit string for session-scoped queries, `"server"` as fallback when no SteamID is available (bots, server console). |
 | `plugin` | string | Plugin filename (minus `.amxx`), used to name the system prompt section |
 | `prompt` | string | User message. Max 8192 characters. |
 | `system` | string | Per-plugin context text (appended under `## <plugin>` in the system prompt). Max 32768 characters. |
 | `auth_token` | string | Required when `GENAI_AUTH_TOKEN` is set on the sidecar. Must match exactly or the request is rejected with `(unauthorized)`. Omit when auth is disabled (default). |
+| `no_memory` | bool | When `true`, memory is not read or written for this query. Default `false`. |
 | `tools` | array | Plugin-registered tool definitions visible to the LLM |
 | `skills` | array | Skill directory names to load for this query |
 
@@ -118,7 +120,7 @@ Signals end of the agent turn for the given `request_id`. The AMX Mod X queue sl
 {"type": "clear_memory", "request_id": "clear1", "player": 3, "session_id": "STEAM_0:1:12345", "auth_token": "mysecret"}
 ```
 
-Clears short-term memory for the given `session_id` (falls back to player's SteamID or `str(player)` when absent). Before deleting the conversation turns, the sidecar summarizes the session and merges it into long-term memory. On success the sidecar sends no reply. `request_id` is included for consistency with the multiplexed protocol.
+Clears short-term memory for the given `session_id` (falls back to `"server"` when absent). Before deleting the conversation turns, the sidecar summarizes the session and merges it into long-term memory. On success the sidecar sends no reply. `request_id` is included for consistency with the multiplexed protocol.
 
 `auth_token` follows the same rules as on `query`: required when `GENAI_AUTH_TOKEN` is configured, rejected with a `response` + `done` frame otherwise.
 

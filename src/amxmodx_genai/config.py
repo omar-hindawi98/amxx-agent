@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     model_endpoint: str = ""
     model_api_key: str = ""
     memory_max_messages: int = 10
+    # Sessions not written to in this many days are removed by the vacuum task.
+    # 0 disables vacuum entirely.
+    memory_session_ttl_days: int = 0
+    # Max concurrent in-flight requests per session_id. Raise above 1 for shared
+    # sessions used by multiple players simultaneously (e.g. team sessions).
+    session_concurrency: int = 1
 
     @field_validator("log_level", mode="before")
     @classmethod

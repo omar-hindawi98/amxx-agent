@@ -26,6 +26,7 @@ class QueryMsg(BaseModel):
     system: str = Field(default="", max_length=_MAX_SYSTEM)
     tools: list[ToolDef] = []
     skills: list[str] = []
+    no_memory: bool = False
 
     @field_validator("prompt", "system", mode="before")
     @classmethod

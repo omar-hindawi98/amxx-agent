@@ -99,7 +99,7 @@ async def handle(
     try:
         if msg.get("type") == "clear_memory":
             req = ClearMemoryMsg.model_validate(msg)
-            session_id = req.session_id or str(req.player)
+            session_id = req.session_id or "server"
             history = await asyncio.to_thread(memory.get, session_id)
             if history:
                 prior = await asyncio.to_thread(memory.get_longterm, session_id)
@@ -116,14 +116,14 @@ async def handle(
 
         if msg.get("type") == "clear_longterm":
             req = ClearLongtermMsg.model_validate(msg)
-            session_id = req.session_id or str(req.player)
+            session_id = req.session_id or "server"
             await asyncio.to_thread(memory.clear_longterm, session_id)
             log.info("cleared long-term memory for session %s", session_id)
             return
 
         req = QueryMsg.model_validate(msg)
         player_id = req.player
-        session_id = req.session_id or str(player_id)
+        session_id = req.session_id or "server"
         prompt = req.prompt
         plugin_name = req.plugin
         plugin_context = req.system
@@ -134,9 +134,10 @@ async def handle(
             await _send({"type": "done"})
             return
 
-        # Prefetch both memory tiers concurrently while building tool list.
-        memory_task = asyncio.create_task(asyncio.to_thread(memory.get, session_id))
-        longterm_task = asyncio.create_task(asyncio.to_thread(memory.get_longterm, session_id))
+        # Prefetch memory concurrently while building tool list (skipped for no_memory queries).
+        if not req.no_memory:
+            memory_task = asyncio.create_task(asyncio.to_thread(memory.get, session_id))
+            longterm_task = asyncio.create_task(asyncio.to_thread(memory.get_longterm, session_id))
 
         session_data: dict = {}
         plugin_tools = [
@@ -153,8 +154,12 @@ async def handle(
             if t.name and t.description
         ]
 
-        player_history = await memory_task
-        longterm = await longterm_task
+        if req.no_memory:
+            player_history: list = []
+            longterm = ""
+        else:
+            player_history = await memory_task
+            longterm = await longterm_task
 
         full_system = _build_system_prompt(plugin_name, plugin_context, longterm)
 
@@ -206,7 +211,8 @@ async def handle(
             log.warning("agent returned no text for session=%s", session_id)
             clean_text = "(no response)"
 
-        await asyncio.to_thread(memory.update, session_id, prompt, clean_text)
+        if not req.no_memory:
+            await asyncio.to_thread(memory.update, session_id, prompt, clean_text)
 
         await _send({"type": "response", "text": clean_text, "status": "ok"})
         await _send({"type": "done"})
