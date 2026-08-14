@@ -32,7 +32,7 @@ async def _send_msg(writer: asyncio.StreamWriter, obj: dict) -> None:
 
 
 async def _read_frames_until_done(
-    reader: asyncio.StreamReader, request_id: str, timeout: float = 3.0
+    reader: asyncio.StreamReader, request_id: str, timeout: float = 30.0
 ) -> list[dict]:
     """Collect frames matching request_id until a done frame for that id arrives."""
     frames: list[dict] = []
