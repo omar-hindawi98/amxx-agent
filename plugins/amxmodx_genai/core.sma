@@ -346,8 +346,8 @@ public native_query_player(plugin_id, num_params)
     get_string(2, prompt, MAX_PROMPT - 1);
     new callback[MAX_CALLBACK];
     get_string(3, callback, MAX_CALLBACK - 1);
-    new bool:this_plugin = (num_params >= 4) ? bool:(get_param(4) != 0) : false;
-    new bool:no_memory   = (num_params >= 5) ? bool:(get_param(5) != 0) : false;
+    new this_plugin = (num_params >= 4) ? (get_param(4) != 0) : 0;
+    new no_memory   = (num_params >= 5) ? (get_param(5) != 0) : 0;
 
     new steamid[MAX_SESSION_ID];
     get_steamid_or_server(player, steamid, MAX_SESSION_ID - 1);
@@ -366,7 +366,7 @@ public native_query_player(plugin_id, num_params)
         copy(session_id, MAX_SESSION_ID - 1, steamid);
     }
 
-    return send_query_frame(plugin_id, player, prompt, callback, session_id, no_memory);
+    return send_query_frame(plugin_id, player, prompt, callback, session_id, bool:no_memory);
 }
 
 // genai_query: explicit session key for custom scopes (team, server, etc.)
@@ -381,8 +381,8 @@ public native_query(plugin_id, num_params)
     get_string(3, session_id, MAX_SESSION_ID - 1);
     if (!session_id[0])
         copy(session_id, MAX_SESSION_ID - 1, "server");
-    new bool:this_plugin = (num_params >= 4) ? bool:(get_param(4) != 0) : false;
-    new bool:no_memory   = (num_params >= 5) ? bool:(get_param(5) != 0) : false;
+    new this_plugin = (num_params >= 4) ? (get_param(4) != 0) : 0;
+    new no_memory   = (num_params >= 5) ? (get_param(5) != 0) : 0;
 
     if (this_plugin) {
         new plugin_filename[MAX_PLUGIN_NAME];
@@ -394,10 +394,10 @@ public native_query(plugin_id, num_params)
             prefix[ext] = 0;
         new scoped[MAX_SESSION_ID];
         format(scoped, MAX_SESSION_ID - 1, "%s__%s", prefix, session_id);
-        return send_query_frame(plugin_id, 0, prompt, callback, scoped, no_memory);
+        return send_query_frame(plugin_id, 0, prompt, callback, scoped, bool:no_memory);
     }
 
-    return send_query_frame(plugin_id, 0, prompt, callback, session_id, no_memory);
+    return send_query_frame(plugin_id, 0, prompt, callback, session_id, bool:no_memory);
 }
 
 public native_cancel(plugin_id, num_params)
