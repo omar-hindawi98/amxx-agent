@@ -23,7 +23,7 @@ async def _send_clear(port: int, session_id: str, player: int = 1) -> None:
         ).encode()
     )
     await writer.drain()
-    await asyncio.sleep(0.3)
+    await asyncio.wait_for(reader.readline(), timeout=5.0)
     writer.close()
     await writer.wait_closed()
 

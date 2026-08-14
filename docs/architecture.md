@@ -65,10 +65,10 @@ Set `GENAI_MODEL_BACKEND` to switch LLM providers without code changes. Supporte
 | `plugins/amxmodx_genai/include/core_tools.inc` | Built-in tool definitions (registered by core.sma) |
 | `plugins/amxmodx_genai/include/core_skills.inc` | Built-in skill registration (amxmodx-reference) |
 | `plugins/include/amxmodx_genai.inc` | Public native declarations for third-party plugins |
-| `examples/weapon_advisor/` | Example: skills + custom tool + per-player memory |
-| `examples/weapon_advisor/skills/weapon_advisor__cs16-strategy/` | Skill directory shipped alongside `weapon_advisor`; deploy to `GENAI_SKILLS_PATH` on the sidecar |
-| `examples/admin_assistant/` | Example: access flags, `genai_append_plugin_context`, core tools |
-| `examples/testable/` | Example: observable plugin for integration testing |
+| `examples/weapon_advisor/` | Example: `genai_register_skill` + custom tool + per-player memory |
+| `examples/admin_assistant/` | Example: tools, skill, cancel, clear_longterm_memory, access control |
+| `examples/testable/` | Example: all plugin API natives exercised; observable for integration testing |
+| `examples/testable/skills/ai_testable__testable-knowledge/` | Skill shipped alongside `testable`; deploy to `GENAI_SKILLS_PATH` |
 | `src/amxmodx_genai/server.py` | `asyncio.start_server` entry point; `_handle_persistent` multiplexes requests |
 | `src/amxmodx_genai/config.py` | Pydantic settings loaded from `GENAI_*` env vars |
 | `src/amxmodx_genai/logger.py` | Root logger configuration (level, format); call `setup()` once at startup |

@@ -8,11 +8,16 @@ Covered functionality:
   - set_value tool: AI stores a key-value pair; test confirms correct args received
   - get_value tool: AI reads a previously set value; test confirms it got it back
   - get_log tool: AI reads the plugin's in-memory log; test confirms JSON array returned
+  - get_pending tool: exercises genai_is_pending wire path
   - Memory: short-term history persists within a session
   - clear_memory: wipes short-term history, subsequent query starts fresh
+  - clear_longterm: discards long-term summary without touching short-term memory
   - Session scoping: two different session_ids do not share memory
-  - Tool call arg parsing: parameters are forwarded correctly in args_json
+  - Player-scoped query: player != 0 accumulates history in a separate session bucket
+  - Skills: skill names in the query frame are forwarded to load_plugin_skills
   - Multiple sequential tool calls in one request
+  - Tool call arg parsing: parameters are forwarded correctly in args_json
+  - Unknown tool: plugin error response forwarded to agent intact
 """
 
 import asyncio
@@ -61,6 +66,11 @@ _TOOLS = [
             },
         ],
     },
+    {
+        "name": "get_pending",
+        "description": "Returns whether a query is currently in-flight for the server session.",
+        "params": [],
+    },
 ]
 
 
@@ -80,6 +90,8 @@ async def _exchange(
     tool_responses: dict[str, str],
     *,
     session_id: str = _SESSION,
+    player: int = 0,
+    skills: list[str] | None = None,
     extra_tools: list | None = None,
 ) -> list[dict]:
     """Send a query and respond to tool_call frames as ai_testable.sma would.
@@ -87,14 +99,16 @@ async def _exchange(
     Returns all frames until type=done.
     """
     tools = list(_TOOLS) + (extra_tools or [])
-    query = {
+    query: dict = {
         "type": "query",
         "request_id": request_id,
-        "player": 0,
+        "player": player,
         "session_id": session_id,
         "prompt": prompt,
         "tools": tools,
     }
+    if skills is not None:
+        query["skills"] = skills
 
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write((json.dumps(query) + "\n").encode())
@@ -131,6 +145,16 @@ async def _exchange(
     return all_frames
 
 
+async def _send_control(port: int, frame: dict) -> None:
+    """Send a control frame (clear_memory, clear_longterm) and wait for done."""
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write((json.dumps(frame) + "\n").encode())
+    await writer.drain()
+    await asyncio.wait_for(reader.readline(), timeout=5.0)
+    writer.close()
+    await writer.wait_closed()
+
+
 # ---------------------------------------------------------------------------
 # set_value: AI calls the tool, correct key+value arrive in args_json
 # ---------------------------------------------------------------------------
@@ -151,7 +175,6 @@ async def test_set_value_args_forwarded(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    # Capture the raw args_json that the tool function receives via the wire.
     with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -159,7 +182,6 @@ async def test_set_value_args_forwarded(unused_tcp_port):
                 unused_tcp_port,
                 "store score=42",
                 "r1",
-                # Plugin side: ai_testable.sma's tool_set_value returns ok
                 {"set_value": '{"ok":true,"action":"created"}'},
             )
 
@@ -248,6 +270,44 @@ async def test_get_log_returns_json_array(unused_tcp_port):
     parsed = json.loads(agent_got[0])
     assert isinstance(parsed, list)
     assert "plugin_init" in parsed
+
+
+# ---------------------------------------------------------------------------
+# get_pending: exercises genai_is_pending via the wire (tool round-trip)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_pending_tool_returns_bool(unused_tcp_port):
+    """get_pending tool result contains a boolean 'pending' field."""
+    agent_got: list[str] = []
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+
+        async def fake_invoke(prompt):
+            tool_fns = {t.__name__: t for t in kwargs.get("tools", [])}
+            result = await tool_fns["get_pending"]()
+            agent_got.append(result)
+            return make_agent_result("checked pending")
+
+        inst.invoke_async = AsyncMock(side_effect=fake_invoke)
+        return inst
+
+    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await _exchange(
+                unused_tcp_port,
+                "is there a pending query?",
+                "r1",
+                {"get_pending": '{"pending":false}'},
+            )
+
+    assert len(agent_got) == 1
+    data = json.loads(agent_got[0])
+    assert "pending" in data
+    assert isinstance(data["pending"], bool)
 
 
 # ---------------------------------------------------------------------------
@@ -341,31 +401,123 @@ async def test_clear_memory_resets_session(unused_tcp_port):
     with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
-            # Build up some history.
             await _exchange(unused_tcp_port, "remember this", "r1", {})
             assert len(mem.get(_SESSION)) == 2
 
-            # Send clear_memory as the plugin would.
-            reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
-            writer.write(
-                (
-                    json.dumps(
-                        {
-                            "type": "clear_memory",
-                            "request_id": "cm1",
-                            "player": 0,
-                            "session_id": _SESSION,
-                        }
-                    )
-                    + "\n"
-                ).encode()
+            await _send_control(
+                unused_tcp_port,
+                {"type": "clear_memory", "request_id": "cm1", "player": 0, "session_id": _SESSION},
             )
-            await writer.drain()
-            await asyncio.sleep(0.3)
-            writer.close()
-            await writer.wait_closed()
 
     assert mem.get(_SESSION) == []
+
+
+# ---------------------------------------------------------------------------
+# clear_longterm: long-term summary is discarded without touching short-term
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_clear_longterm_removes_summary(unused_tcp_port):
+    """clear_longterm deletes the stored long-term summary for a session."""
+    import amxmodx_genai.core.memory as mem
+
+    session = f"{_SESSION}__lt_test"
+    mem.set_longterm(session, "prior knowledge: player prefers AK47")
+    assert mem.get_longterm(session) != ""
+
+    with patch("amxmodx_genai.core.handler.Agent", return_value=MagicMock()):
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await _send_control(
+                unused_tcp_port,
+                {
+                    "type": "clear_longterm",
+                    "request_id": "clt1",
+                    "player": 0,
+                    "session_id": session,
+                },
+            )
+
+    assert mem.get_longterm(session) == ""
+
+
+# ---------------------------------------------------------------------------
+# Player-scoped query: player != 0 accumulates history in its own session
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_player_query_uses_separate_session(unused_tcp_port):
+    """Queries with different session_ids accumulate separate histories."""
+    import amxmodx_genai.core.memory as mem
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
+        return inst
+
+    player_session = f"{_SESSION}_p1"
+
+    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await _exchange(unused_tcp_port, "server prompt", "r1", {}, session_id=_SESSION)
+            await _exchange(
+                unused_tcp_port,
+                "player prompt",
+                "r2",
+                {},
+                session_id=player_session,
+                player=1,
+            )
+
+    server_hist = mem.get(_SESSION)
+    player_hist = mem.get(player_session)
+    assert len(server_hist) == 2
+    assert len(player_hist) == 2
+    assert not any("player prompt" in str(m) for m in server_hist)
+    assert not any("server prompt" in str(m) for m in player_hist)
+
+
+# ---------------------------------------------------------------------------
+# Skills: skill names in the query frame reach load_plugin_skills
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_skills_forwarded_in_query(unused_tcp_port):
+    """Skill names sent in the query frame are passed to load_plugin_skills."""
+    skills_received: list[list[str]] = []
+
+    def make_agent(**kwargs):
+        inst = MagicMock()
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
+        return inst
+
+    def capturing_load_plugin_skills(names):
+        skills_received.append(list(names))
+        return None  # no actual skill files needed for this wire test
+
+    with (
+        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch(
+            "amxmodx_genai.core.handler.load_plugin_skills",
+            side_effect=capturing_load_plugin_skills,
+        ),
+    ):
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+        async with srv:
+            await _exchange(
+                unused_tcp_port,
+                "use skill",
+                "r1",
+                {},
+                skills=["ai_testable__testable-knowledge"],
+            )
+
+    assert len(skills_received) == 1
+    assert "ai_testable__testable-knowledge" in skills_received[0]
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +547,6 @@ async def test_sessions_are_isolated(unused_tcp_port):
 
     assert len(mem.get("testable__a")) == 2
     assert len(mem.get("testable__b")) == 2
-    # No cross-contamination.
     a_texts = [str(t) for t in mem.get("testable__a")]
     b_texts = [str(t) for t in mem.get("testable__b")]
     assert not any("session B" in t for t in a_texts)

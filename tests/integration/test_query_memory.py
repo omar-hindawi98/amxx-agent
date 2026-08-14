@@ -39,7 +39,7 @@ async def test_clear_memory(unused_tcp_port):
             (json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"}) + "\n").encode()
         )
         await writer.drain()
-        await asyncio.sleep(0.5)  # give sidecar time to process
+        await asyncio.wait_for(reader.readline(), timeout=5.0)
         writer.close()
         await writer.wait_closed()
 
@@ -56,7 +56,7 @@ async def test_clear_memory_defaults_to_server_when_no_session_id(unused_tcp_por
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
         writer.write((json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode())
         await writer.drain()
-        await asyncio.sleep(0.5)
+        await asyncio.wait_for(reader.readline(), timeout=5.0)
         writer.close()
         await writer.wait_closed()
 
@@ -152,7 +152,7 @@ async def test_longterm_summary_stored_on_clear(unused_tcp_port):
                 ).encode()
             )
             await writer.drain()
-            await asyncio.sleep(0.5)
+            await asyncio.wait_for(reader.readline(), timeout=5.0)
             writer.close()
             await writer.wait_closed()
 

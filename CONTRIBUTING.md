@@ -83,10 +83,12 @@ plugins/
   include/
     amxmodx_genai.inc        - Public native declarations for third-party plugins
 examples/
-  weapon_advisor/            - genai_register_skill + custom tool example
-    skills/                  - Skill directories shipped with this plugin
-  admin_assistant/           - Admin-only assistant with access flags and core tools
-  testable/                  - Observable plugin for integration testing
+  weapon_advisor/            - genai_register_skill + custom tool + per-player memory
+    skills/                  - Skill directory shipped with this plugin
+  admin_assistant/           - All main API functions: tools, skill, cancel, clear_longterm
+    skills/                  - Skill directory shipped with this plugin
+  testable/                  - All plugin API natives; observable for integration testing
+    skills/                  - Skill directory shipped with this plugin
 src/amxmodx_genai/
   server.py                  - asyncio TCP listener entry point
   config.py                  - Pydantic settings (GENAI_* env vars)

@@ -441,8 +441,8 @@ async def test_persistent_bad_json_skipped_connection_survives(unused_tcp_port):
 
 
 @pytest.mark.asyncio
-async def test_persistent_clear_memory_no_response_sent(unused_tcp_port):
-    """clear_memory over a persistent connection sends no response frames."""
+async def test_persistent_clear_memory_sends_done(unused_tcp_port):
+    """clear_memory over a persistent connection sends a done frame."""
     import amxmodx_genai.server as srv_mod
 
     if srv_mod._sem is None:
@@ -461,12 +461,9 @@ async def test_persistent_clear_memory_no_response_sent(unused_tcp_port):
                     "session_id": "5",
                 },
             )
-            # No frames should arrive within a short window
-            await asyncio.sleep(0.3)
-            try:
-                data = await asyncio.wait_for(reader.read(1), timeout=0.2)
-                assert data == b"", f"expected no data for clear_memory, got {data!r}"
-            except TimeoutError:
-                pass  # correct: no data
+            raw = await asyncio.wait_for(reader.readline(), timeout=5.0)
+            frame = json.loads(raw.decode())
+            assert frame["type"] == "done"
+            assert frame["request_id"] == "cm1"
             writer.close()
             await writer.wait_closed()

@@ -117,6 +117,7 @@ async def handle(
                     log.warning("summarization failed for session %s: %s", session_id, exc)
             await asyncio.to_thread(memory.clear, session_id)
             log.info("cleared short-term memory for session %s", session_id)
+            await _send({"type": "done"})
             return
 
         if msg.get("type") == "clear_longterm":
@@ -124,6 +125,7 @@ async def handle(
             session_id = req.session_id or "server"
             await asyncio.to_thread(memory.clear_longterm, session_id)
             log.info("cleared long-term memory for session %s", session_id)
+            await _send({"type": "done"})
             return
 
         req = QueryMsg.model_validate(msg)
