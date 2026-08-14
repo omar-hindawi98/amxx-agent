@@ -1,3 +1,5 @@
+<div align="center">
+
 # AMX Mod X GenAI
 
 <img src="docs/assets/logo.png" alt="AMX Mod X GenAI" width="200">
@@ -9,6 +11,8 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/ci.yml?branch=main&label=CI)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/ci.yml)
 [![E2E](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/e2e.yml?branch=main&label=E2E)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/e2e.yml)
+
+</div>
 
 LLM agent bridge for AMX Mod X game servers. Plugins call simple Pawn natives; a local Python TCP sidecar runs a Strands agent loop against a configurable LLM backend with two-tier persistent memory, plugin-registered tools and skills, and a composable system prompt.
 
