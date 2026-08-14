@@ -37,7 +37,9 @@ async def test_clear_memory(unused_tcp_port):
         async with srv:
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
-                (json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"}) + "\n").encode()
+                (
+                    json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"}) + "\n"
+                ).encode()
             )
             await writer.drain()
             await asyncio.wait_for(reader.readline(), timeout=5.0)
