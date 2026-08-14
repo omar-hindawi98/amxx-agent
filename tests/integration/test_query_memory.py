@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.integration.conftest import requires_ollama
 from tests.integration.helpers import get_handle, make_agent_result, tcp_exchange
 
 
@@ -77,44 +78,34 @@ async def test_empty_prompt_returns_error(unused_tcp_port):
     assert "done" in types
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_query_response_and_done(unused_tcp_port):
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(
-            return_value=make_agent_result("Buy AK47 and vesthelm.")
+    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        frames = await tcp_exchange(
+            "127.0.0.1",
+            unused_tcp_port,
+            {"type": "query", "player": 2, "prompt": "what to buy?", "tools": []},
         )
-        MockAgent.return_value = mock_instance
-
-        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            frames = await tcp_exchange(
-                "127.0.0.1",
-                unused_tcp_port,
-                {"type": "query", "player": 2, "prompt": "what to buy?", "tools": []},
-            )
 
     types = [f["type"] for f in frames]
     assert "response" in types
     assert "done" in types
     response = next(f for f in frames if f["type"] == "response")
-    assert "AK47" in response["text"]
+    assert response["text"].strip()
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_memory_updated_after_query(unused_tcp_port):
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(return_value=make_agent_result("Save this round."))
-        MockAgent.return_value = mock_instance
-
-        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            await tcp_exchange(
-                "127.0.0.1",
-                unused_tcp_port,
-                {"type": "query", "player": 5, "prompt": "should I save?", "tools": []},
-            )
+    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        await tcp_exchange(
+            "127.0.0.1",
+            unused_tcp_port,
+            {"type": "query", "player": 5, "prompt": "should I save?", "tools": []},
+        )
 
     h = _mem().get("server")
     assert len(h) == 2
@@ -122,26 +113,22 @@ async def test_memory_updated_after_query(unused_tcp_port):
     assert h[1]["role"] == "assistant"
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_named_session_memory(unused_tcp_port):
-    with patch("amxmodx_genai.core.handler.Agent") as MockAgent:
-        mock_instance = MagicMock()
-        mock_instance.invoke_async = AsyncMock(return_value=make_agent_result("Focus B site."))
-        MockAgent.return_value = mock_instance
-
-        srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            await tcp_exchange(
-                "127.0.0.1",
-                unused_tcp_port,
-                {
-                    "type": "query",
-                    "player": 1,
-                    "session_id": "ct_team",
-                    "prompt": "what is our strategy?",
-                    "tools": [],
-                },
-            )
+    srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        await tcp_exchange(
+            "127.0.0.1",
+            unused_tcp_port,
+            {
+                "type": "query",
+                "player": 1,
+                "session_id": "ct_team",
+                "prompt": "what is our strategy?",
+                "tools": [],
+            },
+        )
 
     assert _mem().get("ct_team") != []
     assert _mem().get("1") == []

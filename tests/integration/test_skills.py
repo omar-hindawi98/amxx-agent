@@ -1,10 +1,11 @@
 """Tests for skill loading and injection via the handler."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.integration.conftest import requires_ollama
 from tests.integration.helpers import get_handle, make_agent_result, tcp_exchange
 
 
@@ -89,6 +90,7 @@ async def test_unknown_skill_skipped_query_still_succeeds(unused_tcp_port, tmp_p
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_multiple_skills_both_passed_to_agent_skills(unused_tcp_port, tmp_path):
     """Both skill directories are included when two skills are requested."""
@@ -106,13 +108,7 @@ async def test_multiple_skills_both_passed_to_agent_skills(unused_tcp_port, tmp_
         captured_skills_calls.append(kwargs.get("skills", []))
         return MagicMock()
 
-    def capture_agent(**kwargs):
-        inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
-        return inst
-
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
         patch("amxmodx_genai.skills.loader.settings") as mock_settings,
         patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=fake_agent_skills),
     ):
@@ -142,6 +138,7 @@ async def test_multiple_skills_both_passed_to_agent_skills(unused_tcp_port, tmp_
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_skill_directory_path_passed_to_agent_skills(unused_tcp_port, tmp_path):
     """The path passed to AgentSkills is the exact directory containing SKILL.md."""
@@ -155,13 +152,7 @@ async def test_skill_directory_path_passed_to_agent_skills(unused_tcp_port, tmp_
         captured_paths.append(kwargs.get("skills", []))
         return MagicMock()
 
-    def capture_agent(**kwargs):
-        inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
-        return inst
-
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
         patch("amxmodx_genai.skills.loader.settings") as mock_settings,
         patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=fake_agent_skills),
     ):
@@ -190,6 +181,7 @@ async def test_skill_directory_path_passed_to_agent_skills(unused_tcp_port, tmp_
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_partial_skill_list_passes_only_found_skills(unused_tcp_port, tmp_path):
     """When one of two requested skills is missing, only the found one is passed."""
@@ -203,13 +195,7 @@ async def test_partial_skill_list_passes_only_found_skills(unused_tcp_port, tmp_
         captured_paths.append(kwargs.get("skills", []))
         return MagicMock()
 
-    def capture_agent(**kwargs):
-        inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
-        return inst
-
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
         patch("amxmodx_genai.skills.loader.settings") as mock_settings,
         patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=fake_agent_skills),
     ):

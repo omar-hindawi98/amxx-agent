@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from tests.integration.conftest import requires_ollama
 from tests.integration.helpers import make_agent_result
 
 
@@ -56,6 +57,7 @@ async def _read_frames_until_done(
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_persistent_single_query_returns_frames(unused_tcp_port):
     """A single query over a persistent connection returns response + done."""
@@ -64,34 +66,28 @@ async def test_persistent_single_query_returns_frames(unused_tcp_port):
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
 
-    def make_agent(**kwargs):
-        inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("hello response"))
-        return inst
-
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            reader, writer = await _open_persistent(unused_tcp_port)
-            await _send_msg(
-                writer,
-                {
-                    "type": "query",
-                    "request_id": "r1",
-                    "player": 1,
-                    "prompt": "hello",
-                    "tools": [],
-                },
-            )
-            frames = await _read_frames_until_done(reader, "r1")
-            writer.close()
-            await writer.wait_closed()
+    srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        reader, writer = await _open_persistent(unused_tcp_port)
+        await _send_msg(
+            writer,
+            {
+                "type": "query",
+                "request_id": "r1",
+                "player": 1,
+                "prompt": "hello",
+                "tools": [],
+            },
+        )
+        frames = await _read_frames_until_done(reader, "r1")
+        writer.close()
+        await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types
     assert "done" in types
     response = next(f for f in frames if f["type"] == "response")
-    assert "hello response" in response["text"]
+    assert response["text"].strip()
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +196,7 @@ async def test_persistent_multiplexed_two_queries(unused_tcp_port):
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_persistent_orphan_tool_result_does_not_crash(unused_tcp_port):
     """A tool_result frame with an unknown request_id is logged and silently dropped."""
@@ -208,41 +205,33 @@ async def test_persistent_orphan_tool_result_does_not_crash(unused_tcp_port):
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
 
-    def make_agent(**kwargs):
-        inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
-        return inst
+    srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        reader, writer = await _open_persistent(unused_tcp_port)
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            reader, writer = await _open_persistent(unused_tcp_port)
+        await _send_msg(
+            writer,
+            {
+                "type": "tool_result",
+                "request_id": "ghost_request",
+                "id": "plug_abc123",
+                "content": "some result",
+            },
+        )
 
-            # Send a tool_result for a request that doesn't exist
-            await _send_msg(
-                writer,
-                {
-                    "type": "tool_result",
-                    "request_id": "ghost_request",
-                    "id": "plug_abc123",
-                    "content": "some result",
-                },
-            )
-
-            # Now send a normal query - it should still work
-            await _send_msg(
-                writer,
-                {
-                    "type": "query",
-                    "request_id": "r1",
-                    "player": 1,
-                    "prompt": "hello",
-                    "tools": [],
-                },
-            )
-            frames = await _read_frames_until_done(reader, "r1")
-            writer.close()
-            await writer.wait_closed()
+        await _send_msg(
+            writer,
+            {
+                "type": "query",
+                "request_id": "r1",
+                "player": 1,
+                "prompt": "hello",
+                "tools": [],
+            },
+        )
+        frames = await _read_frames_until_done(reader, "r1")
+        writer.close()
+        await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types
@@ -365,6 +354,7 @@ async def test_persistent_disconnect_cancels_in_flight_tasks(unused_tcp_port):
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_persistent_unknown_message_type_ignored(unused_tcp_port):
     """An unrecognised message type is logged and the connection remains usable."""
@@ -373,33 +363,26 @@ async def test_persistent_unknown_message_type_ignored(unused_tcp_port):
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
 
-    def make_agent(**kwargs):
-        inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("still alive"))
-        return inst
+    srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        reader, writer = await _open_persistent(unused_tcp_port)
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            reader, writer = await _open_persistent(unused_tcp_port)
+        await _send_msg(writer, {"type": "unknown_frame_type", "request_id": "x"})
+        await asyncio.sleep(0.05)
 
-            await _send_msg(writer, {"type": "unknown_frame_type", "request_id": "x"})
-            # Small delay to ensure server processed the unknown frame
-            await asyncio.sleep(0.05)
-
-            await _send_msg(
-                writer,
-                {
-                    "type": "query",
-                    "request_id": "r1",
-                    "player": 1,
-                    "prompt": "hello",
-                    "tools": [],
-                },
-            )
-            frames = await _read_frames_until_done(reader, "r1")
-            writer.close()
-            await writer.wait_closed()
+        await _send_msg(
+            writer,
+            {
+                "type": "query",
+                "request_id": "r1",
+                "player": 1,
+                "prompt": "hello",
+                "tools": [],
+            },
+        )
+        frames = await _read_frames_until_done(reader, "r1")
+        writer.close()
+        await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types
@@ -411,6 +394,7 @@ async def test_persistent_unknown_message_type_ignored(unused_tcp_port):
 # ---------------------------------------------------------------------------
 
 
+@requires_ollama
 @pytest.mark.asyncio
 async def test_persistent_bad_json_skipped_connection_survives(unused_tcp_port):
     """A malformed JSON line is skipped and the connection remains usable."""
@@ -419,35 +403,27 @@ async def test_persistent_bad_json_skipped_connection_survives(unused_tcp_port):
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
 
-    def make_agent(**kwargs):
-        inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("survived"))
-        return inst
+    srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    async with srv:
+        reader, writer = await _open_persistent(unused_tcp_port)
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
-        async with srv:
-            reader, writer = await _open_persistent(unused_tcp_port)
+        writer.write(b"this is not json\n")
+        await writer.drain()
+        await asyncio.sleep(0.05)
 
-            # Send bad JSON first
-            writer.write(b"this is not json\n")
-            await writer.drain()
-            await asyncio.sleep(0.05)
-
-            # Then a valid query
-            await _send_msg(
-                writer,
-                {
-                    "type": "query",
-                    "request_id": "r1",
-                    "player": 1,
-                    "prompt": "hello",
-                    "tools": [],
-                },
-            )
-            frames = await _read_frames_until_done(reader, "r1")
-            writer.close()
-            await writer.wait_closed()
+        await _send_msg(
+            writer,
+            {
+                "type": "query",
+                "request_id": "r1",
+                "player": 1,
+                "prompt": "hello",
+                "tools": [],
+            },
+        )
+        frames = await _read_frames_until_done(reader, "r1")
+        writer.close()
+        await writer.wait_closed()
 
     types = [f["type"] for f in frames]
     assert "response" in types

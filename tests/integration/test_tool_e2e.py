@@ -160,14 +160,24 @@ async def test_two_tools_called_sequentially(unused_tcp_port):
                             "name": "tool_a",
                             "description": "tool a",
                             "params": [
-                                {"name": "x", "type": "integer", "required": True, "description": "x"}
+                                {
+                                    "name": "x",
+                                    "type": "integer",
+                                    "required": True,
+                                    "description": "x",
+                                }
                             ],
                         },
                         {
                             "name": "tool_b",
                             "description": "tool b",
                             "params": [
-                                {"name": "y", "type": "integer", "required": True, "description": "y"}
+                                {
+                                    "name": "y",
+                                    "type": "integer",
+                                    "required": True,
+                                    "description": "y",
+                                }
                             ],
                         },
                     ],
