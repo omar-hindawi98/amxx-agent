@@ -84,7 +84,9 @@ async def _handle_persistent(
 
             else:
                 log.warning("unknown message type %r from %s", msg_type, addr)
-                await send({"type": "response", "text": "(unknown request type)", "request_id": request_id})
+                await send(
+                    {"type": "response", "text": "(unknown request type)", "request_id": request_id}
+                )
                 await send({"type": "done", "request_id": request_id})
 
     finally:

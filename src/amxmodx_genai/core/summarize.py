@@ -33,7 +33,9 @@ async def summarize_session(history: list[dict], prior_summary: str) -> str:
             "Summarize key facts, preferences, and outcomes. 3-5 bullet points, under 200 words."
         )
 
-    agent = Agent(model=get_summary_model(), system_prompt="You are a concise summarizer.", tools=[])
+    agent = Agent(
+        model=get_summary_model(), system_prompt="You are a concise summarizer.", tools=[]
+    )
     result = await agent.invoke_async(prompt)
     text = ""
     result_msg = getattr(result, "message", None)
