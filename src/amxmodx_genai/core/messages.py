@@ -39,3 +39,10 @@ class ClearMemoryMsg(BaseModel):
 
     player: int = -1
     session_id: str = Field(default="", max_length=_MAX_SESSION_ID)
+
+
+class ClearLongtermMsg(BaseModel):
+    """A request to discard a session's long-term summary without touching short-term memory."""
+
+    player: int = -1
+    session_id: str = Field(default="", max_length=_MAX_SESSION_ID)

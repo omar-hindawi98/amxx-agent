@@ -1,11 +1,12 @@
 # AMX Mod X GenAI
 
-[![CI](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/ci.yml?branch=main&label=CI)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/ci.yml)
-[![E2E](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/e2e.yml?branch=main&label=E2E)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/e2e.yml)
 [![Release](https://img.shields.io/github/v/release/omar-hindawi98/amxmodx-genai)](https://github.com/omar-hindawi98/amxmodx-genai/releases)
 [![AMX Mod X](https://img.shields.io/badge/AMX%20Mod%20X-1.8.2%2B-orange)](https://www.amxmodx.org/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+[![CI](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/ci.yml?branch=main&label=CI)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/ci.yml)
+[![E2E](https://img.shields.io/github/actions/workflow/status/omar-hindawi98/amxmodx-genai/e2e.yml?branch=main&label=E2E)](https://github.com/omar-hindawi98/amxmodx-genai/actions/workflows/e2e.yml)
 
 LLM agent bridge for AMX Mod X game servers. Plugins call simple Pawn natives; a local Python TCP sidecar runs a Strands agent loop against the Anthropic API (or a local Ollama model) with two-tier persistent memory, plugin-registered tools and skills, and a composable system prompt.
 
@@ -24,9 +25,7 @@ graph LR
 
 ## Requirements
 
-- AMX Mod X 1.8.2+
 - [AMX Mod X Sockets](https://www.amxmodx.org/sc/sockets.php) module
-- Python 3.11+
 - [uv](https://docs.astral.sh/uv/)
 
 ## Installation
@@ -111,6 +110,14 @@ native genai_add_tool_param(const name[], const type[], bool:required, const des
 
 // Register a skill by name (auto-prefixed, loaded from GENAI_SKILLS_PATH)
 native genai_register_skill(const name[]);
+
+// Returns true if the last response for this player was a sidecar error (not an AI reply)
+// Call inside your genai_query callback to handle errors without string-matching
+native bool:genai_is_error(player, const session_id[] = "");
+
+// Delete long-term (summary) memory for a session without summarizing first
+// Use for a full reset; genai_clear_memory summarizes then clears short-term only
+native genai_clear_longterm_memory(player, const session_id[] = "");
 ```
 
 ### Minimal example

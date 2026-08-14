@@ -1,3 +1,8 @@
+// native_query assembles large JSON buffers on the stack
+// (escaped prompt/system at 2*MAX_PROMPT/MAX_SYSTEM, request at ~65k cells).
+// Total peak stack usage is ~145k cells; this pragma must exceed that.
+#pragma dynamic 196608
+
 #include <amxmodx>
 #include <sockets>
 #include <constants>
@@ -41,6 +46,8 @@ public plugin_init()
     register_native("genai_register_tool",         "native_register_tool");
     register_native("genai_add_tool_param",        "native_add_tool_param");
     register_native("genai_register_skill",        "native_register_skill");
+    register_native("genai_is_error",              "native_is_error");
+    register_native("genai_clear_longterm_memory", "native_clear_longterm_memory");
 
     if (get_pcvar_num(g_pCvarCoreTools))
         register_core_tools();
@@ -137,6 +144,9 @@ static bool:dispatch_message(i, const line[])
         new text[MAX_RESPONSE];
         json_get_string(line, "text", text, sizeof(text) - 1);
         copy(g_szQueueResponse[i], MAX_RESPONSE - 1, text);
+        new status[8];
+        json_get_string(line, "status", status, sizeof(status) - 1);
+        g_bQueueError[i] = equal(status, "error");
 
     } else if (equal(msg_type, "done")) {
         callfunc_begin(g_szQueueCallback[i], g_szQueuePlugin[i]);
@@ -514,4 +524,50 @@ public native_register_skill(plugin_id, num_params)
 
     format(g_szSkillName[g_iSkillCount], MAX_SKILL_NAME - 1, "%s__%s", prefix, name);
     g_iSkillCount++;
+}
+
+// Returns true when the most recently received response for this player/session was an error.
+// Call inside your genai_query callback to distinguish real AI responses from error strings.
+public native_is_error(plugin_id, num_params)
+{
+    new player = get_param(1);
+    new session_id[MAX_SESSION_ID];
+    if (num_params >= 2)
+        get_string(2, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0]) {
+        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
+        if (!session_id[0])
+            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    }
+
+    new slot = find_session_slot(session_id, player);
+    if (slot == -1)
+        return 0;
+    return g_bQueueError[slot] ? 1 : 0;
+}
+
+// Clears long-term (summary) memory for a session without touching short-term memory.
+public native_clear_longterm_memory(plugin_id, num_params)
+{
+    new player = get_param(1);
+    new session_id[MAX_SESSION_ID];
+    if (num_params >= 2)
+        get_string(2, session_id, MAX_SESSION_ID - 1);
+    if (!session_id[0]) {
+        get_user_authid(player, session_id, MAX_SESSION_ID - 1);
+        if (!session_id[0])
+            num_to_str(player, session_id, MAX_SESSION_ID - 1);
+    }
+
+    if (!ensure_connected())
+        return;
+
+    new escaped_session[MAX_SESSION_ID * 2];
+    json_escape(session_id, escaped_session, sizeof(escaped_session) - 1);
+
+    new request[MAX_SESSION_ID * 2 + 96];
+    format(request, sizeof(request) - 1,
+        "{^"type^":^"clear_longterm^",^"request_id^":^"0^",^"player^":%d,^"session_id^":^"%s^"}^n",
+        player, escaped_session);
+    socket_send(g_iMainSocket, request, strlen(request));
 }

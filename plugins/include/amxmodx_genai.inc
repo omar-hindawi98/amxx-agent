@@ -117,3 +117,24 @@ native genai_add_tool_param(const name[], const type[], bool:required, const des
  * @param callback    Name of public function in calling plugin
  */
 native genai_register_tool(const name[], const description[], const callback[]);
+
+/**
+ * Returns true if the most recently received response for this player/session
+ * was an error (e.g. timeout, unauthorized, AI unavailable).
+ * Call inside your genai_query callback to distinguish real responses from
+ * error messages without string-matching.
+ *
+ * @param player      Client index
+ * @param session_id  Optional. Session to check. Defaults to player index string.
+ */
+native bool:genai_is_error(player, const session_id[] = "");
+
+/**
+ * Clears long-term (summary) memory for a session without touching short-term memory.
+ * Use when you want to wipe a player's persistent AI memory completely, e.g. season reset.
+ * Unlike genai_clear_memory, this does NOT trigger summarization - it discards the summary.
+ *
+ * @param player      Client index
+ * @param session_id  Optional. Session to clear. Defaults to player index string.
+ */
+native genai_clear_longterm_memory(player, const session_id[] = "");

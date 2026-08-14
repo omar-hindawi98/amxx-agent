@@ -141,3 +141,11 @@ def set_longterm(session_id: str, summary: str) -> None:
             row.updated_at = now
         else:
             db.add(_LongtermRow(session_id=session_id, summary=summary, updated_at=now))
+
+
+def clear_longterm(session_id: str) -> None:
+    """Delete the long-term summary for session_id, if any."""
+    with Session(_engine) as db, db.begin():
+        row = db.get(_LongtermRow, session_id)
+        if row:
+            db.delete(row)

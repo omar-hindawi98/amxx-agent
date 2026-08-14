@@ -203,4 +203,10 @@ async def test_longterm_injected_into_system_prompt(unused_tcp_port):
                 },
             )
 
-    assert "Player prefers rifles" in captured_kwargs.get("system_prompt", "")
+    system_prompt = captured_kwargs.get("system_prompt", [])
+    prompt_text = (
+        "".join(b.get("text", "") for b in system_prompt)
+        if isinstance(system_prompt, list)
+        else system_prompt
+    )
+    assert "Player prefers rifles" in prompt_text

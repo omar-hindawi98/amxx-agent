@@ -21,10 +21,18 @@ On `genai_clear_memory`: summarize the current short-term turns, merge the summa
 
 Session IDs default to the player's SteamID. Bots and LAN clients without a SteamID fall back to `str(player)`. Plugins can pass a custom `session_id` to share memory across players or create player-independent sessions.
 
+## Alternatives Considered
+
+- **In-memory only** - simplest, zero overhead, but all context is lost on sidecar restart or server reboot.
+- **Raw turns only, no summarization** - persistent but grows unboundedly; long sessions push context length and cost past acceptable limits.
+- **Per-turn summarization** - compress every turn as it arrives; loses conversational detail that is useful within a session and adds LLM cost on every message.
+- **Vector store (semantic search)** - richer recall but adds an external dependency, significant operational complexity, and embedding cost for a game-server deployment.
+- **External store (Redis, Postgres)** - unnecessary operational burden for a self-contained sidecar; SQLite WAL mode handles the concurrency requirements.
+
 ## Consequences
 
 - Context window stays bounded regardless of session length.
 - Cross-session memory survives sidecar restarts.
 - Summarization costs one extra LLM call per `clear_memory`. Acceptable because `clear_memory` is called infrequently (typically on player disconnect).
-- Long-term memory is never cleared by `clear_memory`; it accumulates across sessions. There is currently no API to wipe long-term memory.
-- `GENAI_MEMORY_MAX_MESSAGES` counts turns (user+assistant pairs), not individual messages. `20` turns = up to 40 DB rows.
+- Long-term memory is never cleared by `clear_memory`; it accumulates across sessions. A separate `clear_longterm` message wipes it when needed (e.g. player account reset).
+- `GENAI_MEMORY_MAX_MESSAGES` counts turns (user+assistant pairs), not individual messages. Default `10` turns = up to 20 DB rows.

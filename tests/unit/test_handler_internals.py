@@ -68,52 +68,87 @@ def test_shift_headings_multiline():
 # ---------------------------------------------------------------------------
 
 
+def _prompt_text(blocks: list) -> str:
+    """Concatenate text from all SystemContentBlock entries."""
+    return "".join(b.get("text", "") for b in blocks)
+
+
+def test_build_system_prompt_returns_list():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "")
+    assert isinstance(result, list)
+
+
+def test_build_system_prompt_has_cache_point():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "")
+    assert any("cachePoint" in b for b in result)
+
+
 def test_build_system_prompt_base_only():
     h = _get_handler()
     result = h._build_system_prompt("", "", "")
-    assert result == h._BASE_SYSTEM_PROMPT
+    assert h._BASE_SYSTEM_PROMPT in _prompt_text(result)
 
 
 def test_build_system_prompt_with_longterm():
     h = _get_handler()
     result = h._build_system_prompt("", "", "- Player prefers rifles")
-    assert "Memory from previous sessions" in result
-    assert "Player prefers rifles" in result
+    text = _prompt_text(result)
+    assert "Memory from previous sessions" in text
+    assert "Player prefers rifles" in text
+
+
+def test_build_system_prompt_longterm_after_cache_point():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "some memory")
+    cache_idx = next(i for i, b in enumerate(result) if "cachePoint" in b)
+    longterm_idx = next(i for i, b in enumerate(result) if "Memory" in b.get("text", ""))
+    assert longterm_idx > cache_idx
+
+
+def test_build_system_prompt_no_longterm_block_when_empty():
+    h = _get_handler()
+    result = h._build_system_prompt("", "", "")
+    assert not any("Memory" in b.get("text", "") for b in result)
 
 
 def test_build_system_prompt_with_plugin_context():
     h = _get_handler()
     result = h._build_system_prompt("myplugin", "# Rules\nDo stuff", "")
-    assert "## myplugin" in result
-    assert "### Rules" in result
-    assert "Do stuff" in result
+    text = _prompt_text(result)
+    assert "## myplugin" in text
+    assert "### Rules" in text
+    assert "Do stuff" in text
 
 
 def test_build_system_prompt_unnamed_plugin():
     h = _get_handler()
     result = h._build_system_prompt("", "Some context", "")
-    assert "## Plugin context" in result
-    assert "Some context" in result
+    text = _prompt_text(result)
+    assert "## Plugin context" in text
+    assert "Some context" in text
 
 
 def test_build_system_prompt_all_three():
     h = _get_handler()
     result = h._build_system_prompt("myplugin", "# Rules", "- fact")
-    assert "Memory from previous sessions" in result
-    assert "- fact" in result
-    assert "## myplugin" in result
-    assert "### Rules" in result
+    text = _prompt_text(result)
+    assert "Memory from previous sessions" in text
+    assert "- fact" in text
+    assert "## myplugin" in text
+    assert "### Rules" in text
 
 
 def test_build_system_prompt_plugin_headings_nested():
     # Headings inside plugin_context must be shifted so they sit below ## plugin
     h = _get_handler()
     result = h._build_system_prompt("p", "# Top\n## Sub", "")
-    assert "### Top" in result
-    assert "#### Sub" in result
-    # Original bare heading chars should not appear at those levels
-    assert "\n# Top" not in result
-    assert "\n## Sub" not in result
+    text = _prompt_text(result)
+    assert "### Top" in text
+    assert "#### Sub" in text
+    assert "\n# Top" not in text
+    assert "\n## Sub" not in text
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +269,7 @@ async def test_dict_content_block_text_extracted(unused_tcp_port):
 
     response = next(f for f in frames if f["type"] == "response")
     assert response["text"] == "dict response"
+    assert response["status"] == "ok"
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +342,34 @@ async def test_clear_memory_longterm_not_updated_when_summarization_fails(unused
     # Short-term cleared but long-term unchanged
     assert mem.get("100") == []
     assert mem.get_longterm("100") == "existing summary"
+
+
+@pytest.mark.asyncio
+async def test_clear_longterm_removes_longterm_memory(unused_tcp_port):
+    """clear_longterm message deletes the long-term summary without touching short-term memory."""
+    import amxmodx_genai.core.memory as mem
+
+    mem.update("lt1", "hello", "world")
+    mem.set_longterm("lt1", "summary to be deleted")
+
+    from amxmodx_genai.server import handle_once
+
+    srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
+    async with srv:
+        reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
+        writer.write(
+            (
+                json.dumps({"type": "clear_longterm", "player": 1, "session_id": "lt1"}) + "\n"
+            ).encode()
+        )
+        await writer.drain()
+        await asyncio.sleep(0.3)
+        writer.close()
+        await writer.wait_closed()
+
+    # Short-term memory untouched; long-term wiped.
+    assert mem.get("lt1") != []
+    assert mem.get_longterm("lt1") == ""
 
 
 # ---------------------------------------------------------------------------
@@ -524,6 +588,7 @@ async def test_auth_token_rejected_when_missing(unused_tcp_port):
 
     response = next(f for f in frames if f["type"] == "response")
     assert "unauthorized" in response["text"].lower()
+    assert response["status"] == "error"
 
 
 @pytest.mark.asyncio
@@ -652,6 +717,7 @@ async def test_request_timeout_returns_error(unused_tcp_port):
 
     response = next(f for f in frames if f["type"] == "response")
     assert "timed out" in response["text"].lower()
+    assert response["status"] == "error"
 
 
 async def _send_single(host: str, port: int, label: str) -> list[dict]:

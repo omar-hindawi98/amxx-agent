@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     model_tokens: int = 2048
     model_endpoint: str = ""
     model_api_key: str = ""
-    memory_max_messages: int = 20
+    memory_max_messages: int = 10
 
     @field_validator("log_level", mode="before")
     @classmethod

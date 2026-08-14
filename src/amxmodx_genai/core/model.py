@@ -62,7 +62,11 @@ def _build_model(max_tokens: int | None = None):
     if backend == "ollama":
         from strands.models.ollama import OllamaModel
 
-        return OllamaModel(host=endpoint or _OLLAMA_DEFAULT_ENDPOINT, model_id=model_id)
+        return OllamaModel(
+            host=endpoint or _OLLAMA_DEFAULT_ENDPOINT,
+            model_id=model_id,
+            max_tokens=max_tokens,
+        )
 
     if backend == "litellm":
         from strands.models.litellm import LiteLLMModel

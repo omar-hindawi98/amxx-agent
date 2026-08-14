@@ -34,6 +34,8 @@ async def _handle_persistent(
     write_lock = asyncio.Lock()
     # Maps request_id -> Queue where tool_result frames are delivered.
     result_queues: dict[str, asyncio.Queue] = {}
+    # One semaphore per session_id so one session's queued requests never starve others.
+    session_sems: dict[str, asyncio.Semaphore] = {}
     in_flight: set[asyncio.Task] = set()
 
     async def send(obj: dict[str, Any]) -> None:
@@ -67,11 +69,13 @@ async def _handle_persistent(
                         addr,
                     )
 
-            elif msg_type in ("query", "clear_memory"):
+            elif msg_type in ("query", "clear_memory", "clear_longterm"):
                 q: asyncio.Queue = asyncio.Queue()
                 result_queues[request_id] = q
+                session_id = msg.get("session_id") or str(msg.get("player", ""))
+                session_sem = session_sems.setdefault(session_id, asyncio.Semaphore(1))
                 task = asyncio.create_task(
-                    _bounded_handle(msg, send, q),
+                    _bounded_handle(msg, send, q, session_sem),
                     name=f"handle-{request_id}",
                 )
                 in_flight.add(task)
@@ -85,7 +89,7 @@ async def _handle_persistent(
             else:
                 log.warning("unknown message type %r from %s", msg_type, addr)
                 await send(
-                    {"type": "response", "text": "(unknown request type)", "request_id": request_id}
+                    {"type": "response", "text": "(unknown request type)", "status": "error", "request_id": request_id}
                 )
                 await send({"type": "done", "request_id": request_id})
 
@@ -132,7 +136,7 @@ async def handle_once(
         return
 
     q: asyncio.Queue = asyncio.Queue()
-    await _bounded_handle(msg, send, q)
+    await _bounded_handle(msg, send, q, asyncio.Semaphore(1))
 
     writer.close()
     with contextlib.suppress(Exception):
@@ -143,10 +147,12 @@ async def _bounded_handle(
     msg: dict[str, Any],
     send: Any,
     tool_result_queue: asyncio.Queue,
+    session_sem: asyncio.Semaphore,
 ) -> None:
     assert _sem is not None
-    async with _sem:
-        await handle(msg, send, tool_result_queue)
+    async with session_sem:
+        async with _sem:
+            await handle(msg, send, tool_result_queue)
 
 
 async def _track(coro: Any) -> None:

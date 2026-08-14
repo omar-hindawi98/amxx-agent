@@ -15,7 +15,7 @@ def test_defaults():
     assert s.model_tokens == 2048
     assert s.model_endpoint == ""
     assert s.model_api_key == ""
-    assert s.memory_max_messages == 20
+    assert s.memory_max_messages == 10
 
 
 def test_backend_normalized_to_lowercase(monkeypatch):

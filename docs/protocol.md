@@ -90,10 +90,17 @@ Each message includes a `request_id` to correlate requests with their responses.
 ### response (sidecar -> AMX Mod X)
 
 ```json
-{"type": "response", "request_id": "req1", "text": "Rush B this round - CTs are rotating slow."}
+{"type": "response", "request_id": "req1", "text": "Rush B this round - CTs are rotating slow.", "status": "ok"}
 ```
 
 The final conversational text from the agent. `request_id` identifies which query this response belongs to.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | string | The response text, or an error message when `status` is `"error"` |
+| `status` | string | `"ok"` for a real agent response; `"error"` for sidecar-generated errors (timeout, unauthorized, unavailable, etc.) |
+
+Use `status` to distinguish AI responses from error strings without string-matching. Error text values: `(unauthorized)`, `(request timed out)`, `(AI unavailable)`, `(invalid request)`, `(unknown request type)`, `(empty prompt)`.
 
 ### done (sidecar -> AMX Mod X)
 
@@ -114,6 +121,18 @@ Signals end of the agent turn for the given `request_id`. The AMX Mod X queue sl
 Clears short-term memory for the given `session_id` (falls back to player's SteamID or `str(player)` when absent). Before deleting the conversation turns, the sidecar summarizes the session and merges it into long-term memory. On success the sidecar sends no reply. `request_id` is included for consistency with the multiplexed protocol.
 
 `auth_token` follows the same rules as on `query`: required when `GENAI_AUTH_TOKEN` is configured, rejected with a `response` + `done` frame otherwise.
+
+---
+
+### clear_longterm (AMX Mod X -> sidecar)
+
+```json
+{"type": "clear_longterm", "request_id": "clear2", "player": 3, "session_id": "STEAM_0:1:12345", "auth_token": "mysecret"}
+```
+
+Deletes the long-term summary for the given session without touching short-term memory. Unlike `clear_memory`, no summarization is performed - the summary is discarded entirely. Use for a full memory reset (e.g. season/map change where past context is no longer relevant). On success the sidecar sends no reply.
+
+`auth_token` follows the same rules as on `query`.
 
 ## Encoding
 

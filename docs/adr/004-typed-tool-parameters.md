@@ -14,6 +14,12 @@ Use a builder pattern: `genai_register_tool` registers the tool and sets it as t
 
 Supported types: `"string"`, `"integer"`, `"boolean"`, `"number"`.
 
+## Alternatives Considered
+
+- **Raw JSON Schema strings in Pawn constants** - gives full schema control but is verbose, error-prone to write by hand, and difficult to maintain in a language with no JSON library.
+- **Untyped tools only (description-only)** - simplest to implement; the model infers types from description text, but inference is unreliable and produces wrong types or missing required fields in practice.
+- **Type hints embedded in description strings** (e.g. `"player_id: int"`) - no extra API surface, but requires the sidecar to parse free-form text, which is fragile and undefined.
+
 ## Consequences
 
 - Plugin authors declare parameters in a natural, linear style without writing JSON.
