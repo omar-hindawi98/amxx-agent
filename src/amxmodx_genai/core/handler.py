@@ -66,7 +66,12 @@ class _RetryHook(HookProvider):
             return
         if self._count < _MAX_HOOK_RETRIES:
             self._count += 1
-            log.warning("model call failed (%s), retry %d/%d", event.exception, self._count, _MAX_HOOK_RETRIES)
+            log.warning(
+                "model call failed (%s), retry %d/%d",
+                event.exception,
+                self._count,
+                _MAX_HOOK_RETRIES,
+            )
             event.retry = True
             await asyncio.sleep(2.0**self._count)
 
@@ -187,9 +192,7 @@ async def handle(
             agent_kwargs["plugins"] = plugins
 
         timeout = settings.request_timeout_seconds or None
-        result = await asyncio.wait_for(
-            Agent(**agent_kwargs).invoke_async(prompt), timeout=timeout
-        )
+        result = await asyncio.wait_for(Agent(**agent_kwargs).invoke_async(prompt), timeout=timeout)
 
         final_text = ""
         result_msg = getattr(result, "message", None)
@@ -265,9 +268,7 @@ def _build_system_prompt(
         SystemContentBlock(cachePoint={"type": "default"}),
     ]
     if longterm:
-        blocks.append(
-            SystemContentBlock(text=f"\n## Memory from previous sessions\n\n{longterm}")
-        )
+        blocks.append(SystemContentBlock(text=f"\n## Memory from previous sessions\n\n{longterm}"))
     return blocks
 
 

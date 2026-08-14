@@ -92,7 +92,12 @@ async def _handle_persistent(
             else:
                 log.warning("unknown message type %r from %s", msg_type, addr)
                 await send(
-                    {"type": "response", "text": "(unknown request type)", "status": "error", "request_id": request_id}
+                    {
+                        "type": "response",
+                        "text": "(unknown request type)",
+                        "status": "error",
+                        "request_id": request_id,
+                    }
                 )
                 await send({"type": "done", "request_id": request_id})
 
@@ -153,9 +158,8 @@ async def _bounded_handle(
     session_sem: asyncio.Semaphore,
 ) -> None:
     assert _sem is not None
-    async with session_sem:
-        async with _sem:
-            await handle(msg, send, tool_result_queue)
+    async with session_sem, _sem:
+        await handle(msg, send, tool_result_queue)
 
 
 async def _track(coro: Any) -> None:
@@ -176,7 +180,11 @@ async def _vacuum_loop() -> None:
         try:
             removed = await asyncio.to_thread(memory.vacuum, settings.memory_session_ttl_days)
             if removed:
-                log.info("vacuumed %d stale sessions (ttl=%d days)", removed, settings.memory_session_ttl_days)
+                log.info(
+                    "vacuumed %d stale sessions (ttl=%d days)",
+                    removed,
+                    settings.memory_session_ttl_days,
+                )
         except Exception as exc:
             log.warning("vacuum failed: %s", exc)
 
