@@ -2,7 +2,6 @@
   "release-type": "python",
   "packages": {
     ".": {
-      "release-as": "1.0.0",
       "extra-files": [
         {
           "type": "toml",
