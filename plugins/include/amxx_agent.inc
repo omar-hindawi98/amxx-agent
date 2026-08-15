@@ -8,6 +8,9 @@
     #pragma loadlib amxx_agent
 #endif
 
+#include <constants>
+#include <json>
+
 // ---- Natives ----------------------------------------------------------------
 
 /**
