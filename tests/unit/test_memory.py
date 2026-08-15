@@ -197,18 +197,16 @@ async def test_concurrent_updates_different_sessions_isolated():
         for i in range(3):
             await asyncio.to_thread(mem.update, sid, f"p{i}", f"r{i}")
 
-    await asyncio.gather(
-        write_session("alpha"), write_session("beta"), write_session("gamma")
-    )
+    await asyncio.gather(write_session("alpha"), write_session("beta"), write_session("gamma"))
 
     assert len(mem.get("alpha")) == 6
     assert len(mem.get("beta")) == 6
     assert len(mem.get("gamma")) == 6
     # Verify no cross-contamination
     for row in mem.get("alpha"):
-        assert row["content"][0]["text"].startswith("p") or row["content"][0][
-            "text"
-        ].startswith("r")
+        assert row["content"][0]["text"].startswith("p") or row["content"][0]["text"].startswith(
+            "r"
+        )
 
 
 @pytest.mark.asyncio

@@ -182,9 +182,7 @@ async def _vacuum_loop() -> None:
     while True:
         await asyncio.sleep(3600)
         try:
-            removed = await asyncio.to_thread(
-                memory.vacuum, settings.memory_session_ttl_days
-            )
+            removed = await asyncio.to_thread(memory.vacuum, settings.memory_session_ttl_days)
             if removed:
                 log.info(
                     "vacuumed %d stale sessions (ttl=%d days)",
@@ -207,9 +205,7 @@ async def serve() -> None:
 
     if settings.memory_session_ttl_days > 0:
         asyncio.create_task(_vacuum_loop(), name="vacuum")
-        log.info(
-            "session vacuum enabled (ttl=%d days)", settings.memory_session_ttl_days
-        )
+        log.info("session vacuum enabled (ttl=%d days)", settings.memory_session_ttl_days)
 
     async def _handler(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
         await _track(_handle_persistent(r, w))

@@ -40,9 +40,7 @@ async def _read_frames_until_done(
     while True:
         remaining = deadline - asyncio.get_event_loop().time()
         if remaining <= 0:
-            raise TimeoutError(
-                f"timed out waiting for done frame for {request_id}; got {frames}"
-            )
+            raise TimeoutError(f"timed out waiting for done frame for {request_id}; got {frames}")
         raw = await asyncio.wait_for(reader.readline(), timeout=remaining)
         if not raw:
             break
@@ -133,9 +131,7 @@ async def test_persistent_multiplexed_two_queries(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
 
@@ -183,13 +179,9 @@ async def test_persistent_multiplexed_two_queries(unused_tcp_port):
     r1_frames = [f for f in all_frames if f.get("request_id") == "r1"]
     r2_frames = [f for f in all_frames if f.get("request_id") == "r2"]
 
-    assert any(
-        f["type"] == "response" for f in r1_frames
-    ), f"no response for r1: {r1_frames}"
+    assert any(f["type"] == "response" for f in r1_frames), f"no response for r1: {r1_frames}"
     assert any(f["type"] == "done" for f in r1_frames), f"no done for r1: {r1_frames}"
-    assert any(
-        f["type"] == "response" for f in r2_frames
-    ), f"no response for r2: {r2_frames}"
+    assert any(f["type"] == "response" for f in r2_frames), f"no response for r2: {r2_frames}"
     assert any(f["type"] == "done" for f in r2_frames), f"no done for r2: {r2_frames}"
 
     # Each request_id's response frame carries the text from its own agent invocation.
@@ -264,9 +256,7 @@ async def test_persistent_tool_result_routed_to_correct_handler(unused_tcp_port)
 
     async def mock_call(name, args, send, tool_result_queue, request_id, session_data):
         # Record what tool call frame was sent by inspecting queue; just return a canned result
-        session_data.setdefault("calls", []).append(
-            {"tool": name, "args": args, "result": "42"}
-        )
+        session_data.setdefault("calls", []).append({"tool": name, "args": args, "result": "42"})
         return "42"
 
     def make_agent(**kwargs):
@@ -286,9 +276,7 @@ async def test_persistent_tool_result_routed_to_correct_handler(unused_tcp_port)
         patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
         patch("amxx_agent.tools.plugin._call", side_effect=mock_call),
     ):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
             await _send_msg(
@@ -338,9 +326,7 @@ async def test_persistent_disconnect_cancels_in_flight_tasks(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
             await _send_msg(
@@ -462,12 +448,8 @@ async def test_persistent_clear_memory_sends_done(unused_tcp_port):
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
 
-    with patch(
-        "amxx_agent.core.handler.summarize_session", new=AsyncMock(return_value="")
-    ):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+    with patch("amxx_agent.core.handler.summarize_session", new=AsyncMock(return_value="")):
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
             await _send_msg(

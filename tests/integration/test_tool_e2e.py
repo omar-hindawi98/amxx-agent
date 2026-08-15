@@ -90,9 +90,7 @@ async def test_real_tool_roundtrip_over_wire(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await _run_with_tool_responses(
                 unused_tcp_port,
@@ -148,9 +146,7 @@ async def test_two_tools_called_sequentially(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await _run_with_tool_responses(
                 unused_tcp_port,
@@ -221,9 +217,7 @@ async def test_tool_result_truncated_at_limit(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _run_with_tool_responses(
                 unused_tcp_port,
@@ -232,9 +226,7 @@ async def test_tool_result_truncated_at_limit(unused_tcp_port):
                     "request_id": "r1",
                     "player": 1,
                     "prompt": "call big tool",
-                    "tools": [
-                        {"name": "big_tool", "description": "returns large payload"}
-                    ],
+                    "tools": [{"name": "big_tool", "description": "returns large payload"}],
                 },
                 {"big_tool": large_payload},
             )
@@ -266,9 +258,7 @@ async def test_tool_call_result_stored_in_memory(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _run_with_tool_responses(
                 unused_tcp_port,

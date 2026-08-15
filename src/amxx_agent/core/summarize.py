@@ -49,9 +49,7 @@ async def summarize_session(history: list[dict], prior_summary: str) -> str:
         )
         for block in content:
             block_text = (
-                block.get("text", "")
-                if isinstance(block, dict)
-                else getattr(block, "text", "")
+                block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
             )
             if block_text:
                 text += block_text

@@ -47,9 +47,7 @@ async def test_native_tools_passed_to_agent(unused_tcp_port, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_current_datetime_tool_callable_returns_iso_string(
-    unused_tcp_port, monkeypatch
-):
+async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port, monkeypatch):
     """current_datetime tool can be called and returns an ISO 8601 string."""
     monkeypatch.setenv("AGENT_MODEL_BACKEND", "anthropic")
     for mod in list(sys.modules):

@@ -134,9 +134,7 @@ async def test_plugin_tool_calls_recorded_in_session_data(unused_tcp_port):
     captured_session_data: dict = {}
 
     async def mock_call(name, args, send, tool_result_queue, request_id, session_data):
-        session_data.setdefault("calls", []).append(
-            {"tool": name, "args": args, "result": "ok"}
-        )
+        session_data.setdefault("calls", []).append({"tool": name, "args": args, "result": "ok"})
         captured_session_data.update(session_data)
         return "ok"
 

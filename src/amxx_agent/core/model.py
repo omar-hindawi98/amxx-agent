@@ -14,9 +14,7 @@ def validate() -> None:
     """Raise at startup if required credentials for the configured backend are missing."""
     backend = settings.model_backend
     if backend in _NEEDS_API_KEY and not settings.model_api_key:
-        raise RuntimeError(
-            f"AGENT_MODEL_API_KEY is required when AGENT_MODEL_BACKEND={backend}"
-        )
+        raise RuntimeError(f"AGENT_MODEL_API_KEY is required when AGENT_MODEL_BACKEND={backend}")
 
 
 def get_model():
@@ -35,9 +33,7 @@ def get_summary_model():
     """
     global _cached_summary_model
     if _cached_summary_model is None:
-        _cached_summary_model = _build_model(
-            max_tokens=max(settings.model_tokens, 1024)
-        )
+        _cached_summary_model = _build_model(max_tokens=max(settings.model_tokens, 1024))
     return _cached_summary_model
 
 
@@ -108,6 +104,4 @@ def _build_model(max_tokens: int | None = None):
     from strands.models.anthropic import AnthropicModel
 
     client_args = {"api_key": api_key} if api_key else {}
-    return AnthropicModel(
-        model_id=model_id, max_tokens=max_tokens, client_args=client_args
-    )
+    return AnthropicModel(model_id=model_id, max_tokens=max_tokens, client_args=client_args)

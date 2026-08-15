@@ -38,9 +38,7 @@ log = logging.getLogger(__name__)
 _SYSTEM_PROMPT_PATH = Path(__file__).parent.parent / "SYSTEM_PROMPT.md"
 try:
     _BASE_SYSTEM_PROMPT = (
-        _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
-        if _SYSTEM_PROMPT_PATH.exists()
-        else ""
+        _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8") if _SYSTEM_PROMPT_PATH.exists() else ""
     )
 except OSError as _exc:
     log.warning("could not read system prompt from %s: %s", _SYSTEM_PROMPT_PATH, _exc)
@@ -121,14 +119,10 @@ async def handle(
                 try:
                     summary = await summarize_session(history, prior)
                     if summary:
-                        await asyncio.to_thread(
-                            memory.set_longterm, session_id, summary
-                        )
+                        await asyncio.to_thread(memory.set_longterm, session_id, summary)
                         log.info("updated long-term memory for session %s", session_id)
                 except Exception as exc:
-                    log.warning(
-                        "summarization failed for session %s: %s", session_id, exc
-                    )
+                    log.warning("summarization failed for session %s: %s", session_id, exc)
             await asyncio.to_thread(memory.clear, session_id)
             log.info("cleared short-term memory for session %s", session_id)
             await _send({"type": "done"})
@@ -151,18 +145,14 @@ async def handle(
         skill_names = req.skills
 
         if not prompt:
-            await _send(
-                {"type": "response", "text": "(empty prompt)", "status": "error"}
-            )
+            await _send({"type": "response", "text": "(empty prompt)", "status": "error"})
             await _send({"type": "done"})
             return
 
         # Prefetch memory concurrently while building tool list (skipped for no_memory queries).
         if not req.no_memory:
             memory_task = asyncio.create_task(asyncio.to_thread(memory.get, session_id))
-            longterm_task = asyncio.create_task(
-                asyncio.to_thread(memory.get_longterm, session_id)
-            )
+            longterm_task = asyncio.create_task(asyncio.to_thread(memory.get_longterm, session_id))
 
         session_data: dict = {}
         plugin_tools = [
@@ -203,8 +193,7 @@ async def handle(
             "name": "amxx-agent",
             "model": get_model(),
             "system_prompt": full_system,
-            "tools": plugin_tools
-            + (native_tools if settings.model_backend != "ollama" else []),
+            "tools": plugin_tools + (native_tools if settings.model_backend != "ollama" else []),
             "messages": player_history,
             "callback_handler": None,
             "hooks": [_RetryHook()],
@@ -213,9 +202,7 @@ async def handle(
             agent_kwargs["plugins"] = plugins
 
         timeout = settings.request_timeout_seconds or None
-        result = await asyncio.wait_for(
-            Agent(**agent_kwargs).invoke_async(prompt), timeout=timeout
-        )
+        result = await asyncio.wait_for(Agent(**agent_kwargs).invoke_async(prompt), timeout=timeout)
 
         final_text = ""
         result_msg = getattr(result, "message", None)
@@ -227,9 +214,7 @@ async def handle(
             )
             for block in content:
                 text = (
-                    block.get("text", "")
-                    if isinstance(block, dict)
-                    else getattr(block, "text", "")
+                    block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
                 )
                 if text:
                     final_text += text
@@ -293,9 +278,7 @@ def _build_system_prompt(
         SystemContentBlock(cachePoint={"type": "default"}),
     ]
     if longterm:
-        blocks.append(
-            SystemContentBlock(text=f"\n## Memory from previous sessions\n\n{longterm}")
-        )
+        blocks.append(SystemContentBlock(text=f"\n## Memory from previous sessions\n\n{longterm}"))
     return blocks
 
 

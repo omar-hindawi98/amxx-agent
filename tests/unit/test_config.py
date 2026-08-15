@@ -55,9 +55,7 @@ def test_memory_path_under_home(monkeypatch):
 
     monkeypatch.delenv("AGENT_MEMORY_PATH", raising=False)
     s = Settings()
-    assert (
-        s.memory_path == Path.home() / ".local" / "share" / "amxx_agent" / "memory.db"
-    )
+    assert s.memory_path == Path.home() / ".local" / "share" / "amxx_agent" / "memory.db"
 
 
 def test_skills_path_default_is_absolute():

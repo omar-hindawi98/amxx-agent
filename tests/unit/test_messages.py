@@ -143,15 +143,11 @@ def test_clearmemorymsg_defaults():
 
 
 def test_clearmemorymsg_from_dict():
-    c = ClearMemoryMsg.model_validate(
-        {"type": "clear_memory", "player": 5, "session_id": "5"}
-    )
+    c = ClearMemoryMsg.model_validate({"type": "clear_memory", "player": 5, "session_id": "5"})
     assert c.player == 5
     assert c.session_id == "5"
 
 
 def test_clearmemorymsg_extra_fields_ignored():
-    c = ClearMemoryMsg.model_validate(
-        {"player": 1, "session_id": "1", "unknown": "ignored"}
-    )
+    c = ClearMemoryMsg.model_validate({"player": 1, "session_id": "1", "unknown": "ignored"})
     assert c.player == 1

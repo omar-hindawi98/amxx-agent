@@ -46,11 +46,7 @@ def load_builtin_skills() -> AgentSkills | None:
     Scans for subdirectories of src/amxx_agent/skills/ that contain a SKILL.md.
     Returns None when no built-in skills exist.
     """
-    dirs = [
-        d
-        for d in _BUILTIN_SKILLS_DIR.iterdir()
-        if d.is_dir() and (d / "SKILL.md").exists()
-    ]
+    dirs = [d for d in _BUILTIN_SKILLS_DIR.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
     if not dirs:
         return None
     return AgentSkills(skills=[str(d) for d in dirs])

@@ -13,10 +13,7 @@ def _get_summarize():
 
 def _make_history(*turns: tuple[str, str]) -> list[dict]:
     """Build a minimal message history from (role, text) pairs."""
-    return [
-        {"role": role, "content": [{"type": "text", "text": text}]}
-        for role, text in turns
-    ]
+    return [{"role": role, "content": [{"type": "text", "text": text}]} for role, text in turns]
 
 
 def _mock_agent_result(text: str) -> MagicMock:

@@ -222,9 +222,7 @@ async def test_partial_skill_list_passes_only_found_skills(unused_tcp_port, tmp_
 
 
 @pytest.mark.asyncio
-async def test_agent_skills_constructor_raises_query_still_succeeds(
-    unused_tcp_port, tmp_path
-):
+async def test_agent_skills_constructor_raises_query_still_succeeds(unused_tcp_port, tmp_path):
     """When AgentSkills() raises during construction, the query completes without plugins."""
     skill_dir = tmp_path / "badskill"
     skill_dir.mkdir()

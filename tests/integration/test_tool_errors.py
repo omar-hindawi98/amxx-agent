@@ -84,9 +84,7 @@ async def test_tool_call_discards_frames_with_wrong_id():
     tool_result_queue: asyncio.Queue = asyncio.Queue()
     session_data: dict = {}
 
-    await tool_result_queue.put(
-        {"type": "tool_result", "id": "wrong_id", "content": "ignored"}
-    )
+    await tool_result_queue.put({"type": "tool_result", "id": "wrong_id", "content": "ignored"})
 
     async def inject_correct_frame():
         for _ in range(50):
@@ -98,9 +96,7 @@ async def test_tool_call_discards_frames_with_wrong_id():
         )
 
     inject_task = asyncio.create_task(inject_correct_frame())
-    result = await plugin_mod._call(
-        "say", "{}", fake_send, tool_result_queue, "req3", session_data
-    )
+    result = await plugin_mod._call("say", "{}", fake_send, tool_result_queue, "req3", session_data)
     await inject_task
 
     assert result == "correct_result"
@@ -128,9 +124,7 @@ async def test_tool_call_send_called_with_correct_frame():
             if call_id_seen:
                 break
             await asyncio.sleep(0.01)
-        await tool_result_queue.put(
-            {"type": "tool_result", "id": call_id_seen[0], "content": "ok"}
-        )
+        await tool_result_queue.put({"type": "tool_result", "id": call_id_seen[0], "content": "ok"})
 
     inject_task = asyncio.create_task(inject_result())
     await plugin_mod._call(

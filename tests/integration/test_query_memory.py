@@ -37,10 +37,7 @@ async def test_clear_memory(unused_tcp_port):
     async with srv:
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
         writer.write(
-            (
-                json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"})
-                + "\n"
-            ).encode()
+            (json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"}) + "\n").encode()
         )
         await writer.drain()
         await asyncio.wait_for(reader.readline(), timeout=70.0)
@@ -59,9 +56,7 @@ async def test_clear_memory_defaults_to_server_when_no_session_id(unused_tcp_por
     srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
-        writer.write(
-            (json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode()
-        )
+        writer.write((json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode())
         await writer.drain()
         await asyncio.wait_for(reader.readline(), timeout=70.0)
         writer.close()
@@ -155,8 +150,7 @@ async def test_longterm_summary_stored_on_clear(unused_tcp_port):
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
                 (
-                    json.dumps({"type": "clear_memory", "player": 7, "session_id": "7"})
-                    + "\n"
+                    json.dumps({"type": "clear_memory", "player": 7, "session_id": "7"}) + "\n"
                 ).encode()
             )
             await writer.drain()

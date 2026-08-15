@@ -37,9 +37,7 @@ def make_agent_factory(text: str = "ok", *, invoke_side_effect=None):
     return capture_agent, captured_kwargs
 
 
-async def tcp_exchange(
-    host: str, port: int, msg: dict, timeout: float = 65.0
-) -> list[dict]:
+async def tcp_exchange(host: str, port: int, msg: dict, timeout: float = 65.0) -> list[dict]:
     """Send one JSON message; read all response frames until type=done."""
     reader, writer = await asyncio.open_connection(host, port)
     writer.write((json.dumps(msg) + "\n").encode())

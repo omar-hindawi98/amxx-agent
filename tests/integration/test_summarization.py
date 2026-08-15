@@ -19,10 +19,7 @@ async def _send_clear(port: int, session_id: str, player: int = 1) -> None:
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write(
         (
-            json.dumps(
-                {"type": "clear_memory", "player": player, "session_id": session_id}
-            )
-            + "\n"
+            json.dumps({"type": "clear_memory", "player": player, "session_id": session_id}) + "\n"
         ).encode()
     )
     await writer.drain()

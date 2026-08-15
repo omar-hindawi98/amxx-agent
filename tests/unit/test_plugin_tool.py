@@ -95,9 +95,7 @@ def _make_send_queue_pair():
     async def send(obj: dict) -> None:
         sent.append(obj)
         if obj.get("type") == "tool_call":
-            await queue.put(
-                {"type": "tool_result", "id": obj["id"], "content": "test_result"}
-            )
+            await queue.put({"type": "tool_result", "id": obj["id"], "content": "test_result"})
 
     return send, queue, sent
 
@@ -108,9 +106,7 @@ async def test_no_params_tool_sends_args_string():
     send, queue, sent = _make_send_queue_pair()
     session_data: dict = {}
 
-    t = make_plugin_tool(
-        "myplugin__get_map", "Returns map name", send, queue, "req1", session_data
-    )
+    t = make_plugin_tool("myplugin__get_map", "Returns map name", send, queue, "req1", session_data)
     fn = t.func if hasattr(t, "func") else t
     result = await fn(args='{"format":"short"}')
     assert result == "test_result"

@@ -122,9 +122,7 @@ async def _exchange(
         all_frames.append(frame)
 
         if frame.get("type") == "tool_call" and frame.get("request_id") == request_id:
-            content = tool_responses.get(
-                frame.get("name", ""), '{"error":"unknown tool"}'
-            )
+            content = tool_responses.get(frame.get("name", ""), '{"error":"unknown tool"}')
             writer.write(
                 (
                     json.dumps(
@@ -179,9 +177,7 @@ async def test_set_value_args_forwarded(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await _exchange(
                 unused_tcp_port,
@@ -223,9 +219,7 @@ async def test_get_value_result_returned_to_agent(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await _exchange(
                 unused_tcp_port,
@@ -264,9 +258,7 @@ async def test_get_log_returns_json_array(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(
                 unused_tcp_port,
@@ -304,9 +296,7 @@ async def test_get_pending_tool_returns_bool(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(
                 unused_tcp_port,
@@ -345,9 +335,7 @@ async def test_set_then_get_sequential(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await _exchange(
                 unused_tcp_port,
@@ -381,15 +369,11 @@ async def test_memory_persists_within_session(unused_tcp_port):
         nonlocal call_count
         call_count += 1
         inst = MagicMock()
-        inst.invoke_async = AsyncMock(
-            return_value=make_agent_result(f"reply_{call_count}")
-        )
+        inst.invoke_async = AsyncMock(return_value=make_agent_result(f"reply_{call_count}"))
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(unused_tcp_port, "first message", "r1", {})
             await _exchange(unused_tcp_port, "second message", "r2", {})
@@ -417,9 +401,7 @@ async def test_clear_memory_resets_session(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(unused_tcp_port, "remember this", "r1", {})
             assert len(mem.get(_SESSION)) == 2
@@ -452,9 +434,7 @@ async def test_clear_longterm_removes_summary(unused_tcp_port):
     assert mem.get_longterm(session) != ""
 
     with patch("amxx_agent.core.handler.Agent", return_value=MagicMock()):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _send_control(
                 unused_tcp_port,
@@ -487,13 +467,9 @@ async def test_player_query_uses_separate_session(unused_tcp_port):
     player_session = f"{_SESSION}_p1"
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
-            await _exchange(
-                unused_tcp_port, "server prompt", "r1", {}, session_id=_SESSION
-            )
+            await _exchange(unused_tcp_port, "server prompt", "r1", {}, session_id=_SESSION)
             await _exchange(
                 unused_tcp_port,
                 "player prompt",
@@ -537,9 +513,7 @@ async def test_skills_forwarded_in_query(unused_tcp_port):
             side_effect=capturing_load_plugin_skills,
         ),
     ):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(
                 unused_tcp_port,
@@ -569,9 +543,7 @@ async def test_sessions_are_isolated(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(
                 unused_tcp_port, "session A message", "r1", {}, session_id="testable__a"
@@ -611,9 +583,7 @@ async def test_unknown_tool_error_forwarded(unused_tcp_port):
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(
-            _get_persistent(), "127.0.0.1", unused_tcp_port
-        )
+        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await _exchange(
                 unused_tcp_port,

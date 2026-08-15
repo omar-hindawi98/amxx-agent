@@ -103,9 +103,7 @@ def test_build_system_prompt_longterm_after_cache_point():
     h = _get_handler()
     result = h._build_system_prompt("", "", "some memory")
     cache_idx = next(i for i, b in enumerate(result) if "cachePoint" in b)
-    longterm_idx = next(
-        i for i, b in enumerate(result) if "Memory" in b.get("text", "")
-    )
+    longterm_idx = next(i for i, b in enumerate(result) if "Memory" in b.get("text", ""))
     assert longterm_idx > cache_idx
 
 
@@ -291,9 +289,7 @@ async def test_clear_memory_still_clears_when_summarization_fails(unused_tcp_por
     async def failing_summarize(*args, **kwargs):
         raise RuntimeError("LLM is down")
 
-    with patch(
-        "amxx_agent.core.handler.summarize_session", side_effect=failing_summarize
-    ):
+    with patch("amxx_agent.core.handler.summarize_session", side_effect=failing_summarize):
         from amxx_agent.server import handle_once
 
         srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
@@ -303,10 +299,7 @@ async def test_clear_memory_still_clears_when_summarization_fails(unused_tcp_por
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
                 (
-                    json.dumps(
-                        {"type": "clear_memory", "player": 99, "session_id": "99"}
-                    )
-                    + "\n"
+                    json.dumps({"type": "clear_memory", "player": 99, "session_id": "99"}) + "\n"
                 ).encode()
             )
             await writer.drain()
@@ -330,9 +323,7 @@ async def test_clear_memory_longterm_not_updated_when_summarization_fails(
     async def failing_summarize(*args, **kwargs):
         raise RuntimeError("LLM is down")
 
-    with patch(
-        "amxx_agent.core.handler.summarize_session", side_effect=failing_summarize
-    ):
+    with patch("amxx_agent.core.handler.summarize_session", side_effect=failing_summarize):
         from amxx_agent.server import handle_once
 
         srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
@@ -342,10 +333,7 @@ async def test_clear_memory_longterm_not_updated_when_summarization_fails(
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
                 (
-                    json.dumps(
-                        {"type": "clear_memory", "player": 100, "session_id": "100"}
-                    )
-                    + "\n"
+                    json.dumps({"type": "clear_memory", "player": 100, "session_id": "100"}) + "\n"
                 ).encode()
             )
             await writer.drain()
@@ -373,8 +361,7 @@ async def test_clear_longterm_removes_longterm_memory(unused_tcp_port):
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
         writer.write(
             (
-                json.dumps({"type": "clear_longterm", "player": 1, "session_id": "lt1"})
-                + "\n"
+                json.dumps({"type": "clear_longterm", "player": 1, "session_id": "lt1"}) + "\n"
             ).encode()
         )
         await writer.drain()
@@ -463,9 +450,7 @@ async def test_response_frame_arrives_before_done_frame(unused_tcp_port):
 
     def make_agent(**kwargs):
         inst = MagicMock()
-        inst.invoke_async = AsyncMock(
-            return_value=make_agent_result("ordered response")
-        )
+        inst.invoke_async = AsyncMock(return_value=make_agent_result("ordered response"))
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
@@ -480,9 +465,9 @@ async def test_response_frame_arrives_before_done_frame(unused_tcp_port):
     types = [f["type"] for f in frames]
     assert "response" in types
     assert "done" in types
-    assert types.index("response") < types.index(
-        "done"
-    ), f"expected response before done, got ordering: {types}"
+    assert types.index("response") < types.index("done"), (
+        f"expected response before done, got ordering: {types}"
+    )
 
 
 @pytest.mark.asyncio
@@ -508,9 +493,9 @@ async def test_error_response_frame_arrives_before_done_frame(unused_tcp_port):
             )
 
     types = [f["type"] for f in frames]
-    assert types.index("response") < types.index(
-        "done"
-    ), f"expected response before done on error path, got: {types}"
+    assert types.index("response") < types.index("done"), (
+        f"expected response before done on error path, got: {types}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -548,9 +533,7 @@ async def test_semaphore_queues_requests_when_saturated(unused_tcp_port):
         call_count += 1
         n = call_count
         inst = MagicMock()
-        inst.invoke_async = AsyncMock(
-            side_effect=slow_invoke if n == 1 else fast_invoke
-        )
+        inst.invoke_async = AsyncMock(side_effect=slow_invoke if n == 1 else fast_invoke)
         return inst
 
     with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
@@ -559,15 +542,11 @@ async def test_semaphore_queues_requests_when_saturated(unused_tcp_port):
         srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
         async with srv:
             # Send first request and wait until its agent is running
-            t1 = asyncio.create_task(
-                _send_single("127.0.0.1", unused_tcp_port, "first")
-            )
+            t1 = asyncio.create_task(_send_single("127.0.0.1", unused_tcp_port, "first"))
             await first_started.wait()
 
             # Send second request - it must queue behind the semaphore
-            t2 = asyncio.create_task(
-                _send_single("127.0.0.1", unused_tcp_port, "second")
-            )
+            t2 = asyncio.create_task(_send_single("127.0.0.1", unused_tcp_port, "second"))
             # Small yield to let t2 reach the semaphore
             await asyncio.sleep(0.05)
 
@@ -949,10 +928,7 @@ async def _send_single(host: str, port: int, label: str) -> list[dict]:
 
     reader, writer = await asyncio.open_connection(host, port)
     writer.write(
-        (
-            json.dumps({"type": "query", "player": 1, "prompt": label, "tools": []})
-            + "\n"
-        ).encode()
+        (json.dumps({"type": "query", "player": 1, "prompt": label, "tools": []}) + "\n").encode()
     )
     await writer.drain()
     frames: list[dict] = []
