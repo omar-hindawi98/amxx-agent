@@ -19,9 +19,13 @@ def load_plugin_skills(skill_names: list[str]) -> AgentSkills | None:
     Each name is resolved against AGENT_SKILLS_PATH. Missing skills are logged
     and skipped so a bad name never aborts the whole query.
     """
+    skills_root = settings.skills_path.resolve()
     dirs: list[Path] = []
     for name in skill_names:
-        path = settings.skills_path / name
+        path = (settings.skills_path / name).resolve()
+        if not path.is_relative_to(skills_root):
+            log.warning("skill %r escapes skills_path, skipping", name)
+            continue
         if (path / "SKILL.md").exists():
             dirs.append(path)
         else:
