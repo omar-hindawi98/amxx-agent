@@ -3,7 +3,7 @@ Integration tests against a real running sidecar.
 
 Run with:
 
-    GENAI_SIDECAR_HOST=127.0.0.1 pytest tests/integration/
+    AGENT_SIDECAR_HOST=127.0.0.1 pytest tests/integration/
 
 Tests assert protocol correctness and non-empty responses only.
 They do NOT assert exact LLM output - that would be brittle.
@@ -15,12 +15,12 @@ import os
 
 import pytest
 
-SIDECAR_HOST = os.environ.get("GENAI_SIDECAR_HOST", "")
-SIDECAR_PORT = int(os.environ.get("GENAI_SIDECAR_PORT", "27016"))
+SIDECAR_HOST = os.environ.get("AGENT_SIDECAR_HOST", "")
+SIDECAR_PORT = int(os.environ.get("AGENT_SIDECAR_PORT", "27016"))
 
 pytestmark = pytest.mark.skipif(
     not SIDECAR_HOST,
-    reason="GENAI_SIDECAR_HOST not set - skipping live sidecar tests",
+    reason="AGENT_SIDECAR_HOST not set - skipping live sidecar tests",
 )
 
 
@@ -60,7 +60,9 @@ def frame_types(frames: list[dict]) -> list[str]:
 
 async def test_protocol_response_and_done_frames_returned():
     """A query must produce exactly one response frame and one done frame."""
-    frames = await exchange({"type": "query", "player": 1, "prompt": "say hello", "tools": []})
+    frames = await exchange(
+        {"type": "query", "player": 1, "prompt": "say hello", "tools": []}
+    )
     types = frame_types(frames)
     assert "response" in types, f"no response frame: {types}"
     assert "done" in types, f"no done frame: {types}"
@@ -68,7 +70,9 @@ async def test_protocol_response_and_done_frames_returned():
 
 async def test_protocol_response_text_non_empty():
     """The response frame must carry non-empty text."""
-    frames = await exchange({"type": "query", "player": 1, "prompt": "say hello", "tools": []})
+    frames = await exchange(
+        {"type": "query", "player": 1, "prompt": "say hello", "tools": []}
+    )
     response = next(f for f in frames if f["type"] == "response")
     assert response["text"].strip(), "response text was empty"
 
@@ -95,13 +99,16 @@ async def test_memory_persists_within_session():
         }
     )
     response = next(f for f in frames if f["type"] == "response")
-    assert "dust" in response["text"].lower(), (
-        f"expected dust2 in follow-up response, got: {response['text']}"
-    )
+    assert (
+        "dust" in response["text"].lower()
+    ), f"expected dust2 in follow-up response, got: {response['text']}"
     # cleanup
     reader, writer = await asyncio.open_connection(SIDECAR_HOST, SIDECAR_PORT)
     writer.write(
-        (json.dumps({"type": "clear_memory", "player": 1, "session_id": session}) + "\n").encode()
+        (
+            json.dumps({"type": "clear_memory", "player": 1, "session_id": session})
+            + "\n"
+        ).encode()
     )
     await writer.drain()
     await asyncio.sleep(1.0)

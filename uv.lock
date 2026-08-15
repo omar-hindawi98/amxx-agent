@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "amxmodx-genai"
+name = "amxx-agent"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

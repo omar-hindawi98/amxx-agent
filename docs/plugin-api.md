@@ -1,19 +1,19 @@
 # Plugin API
 
-This guide covers writing an AMX Mod X plugin that uses amxmodx_genai.
+This guide covers writing an AMX Mod X plugin that uses amxx_agent.
 
 ## Setup
 
-Copy `plugins/include/amxmodx_genai.inc` to your server's `addons/amxmodx/scripting/include/` directory and add `#include <amxmodx_genai>` to your plugin.
+Copy `plugins/include/amxx_agent.inc` to your server's `addons/amxmodx/scripting/include/` directory and add `#include <amxx_agent>` to your plugin.
 
 `core.amxx` must be loaded before your plugin in `plugins.ini`.
 
 ## Natives
 
-### genai_query_player
+### agent_query_player
 
 ```pawn
-native genai_query_player(player, const prompt[], const callback[], bool:this_plugin = false, bool:no_memory = false);
+native agent_query_player(player, const prompt[], const callback[], bool:this_plugin = false, bool:no_memory = false);
 ```
 
 Sends a prompt scoped to this player's memory. The session key is the player's SteamID so memory survives reconnects and map changes.
@@ -25,22 +25,22 @@ public on_response(player, const response[], bool:is_error)
 
 `is_error` is `true` when the response is a sidecar error (timeout, unauthorized, AI unavailable) rather than a real AI reply.
 
-| Parameter | Description |
-|-----------|-------------|
-| `player` | Client index |
-| `prompt` | User message to send |
-| `callback` | Name of public function in calling plugin to receive response |
+| Parameter     | Description                                                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `player`      | Client index                                                                                                                                                                        |
+| `prompt`      | User message to send                                                                                                                                                                |
+| `callback`    | Name of public function in calling plugin to receive response                                                                                                                       |
 | `this_plugin` | When `false` (default), memory is shared across all plugins for the same player. When `true`, memory is isolated to this plugin only (session key becomes `"{plugin}__{steamid}"`). |
-| `no_memory` | When `true`, the query runs with no history and the response is not stored. Use for one-off lookups that should not pollute the session. |
+| `no_memory`   | When `true`, the query runs with no history and the response is not stored. Use for one-off lookups that should not pollute the session.                                            |
 
 Returns the queue slot index on success, or `-1` if the queue is full or the socket failed to open.
 
 ---
 
-### genai_query
+### agent_query
 
 ```pawn
-native genai_query(const prompt[], const callback[], const session_id[], bool:this_plugin = false, bool:no_memory = false);
+native agent_query(const prompt[], const callback[], const session_id[], bool:this_plugin = false, bool:no_memory = false);
 ```
 
 Sends a prompt with an explicit session key. Use for team/group sessions, server-wide sessions, or any custom shared context. All callers that pass the same `session_id` share the same memory.
@@ -52,13 +52,13 @@ public on_team_response(const response[], bool:is_error)
 
 `is_error` is `true` when the response is a sidecar error rather than a real AI reply.
 
-| Parameter | Description |
-|-----------|-------------|
-| `prompt` | User message to send |
-| `callback` | Name of public function in calling plugin to receive response |
-| `session_id` | Conversation history key. All callers passing the same value share memory. |
+| Parameter     | Description                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `prompt`      | User message to send                                                                                                     |
+| `callback`    | Name of public function in calling plugin to receive response                                                            |
+| `session_id`  | Conversation history key. All callers passing the same value share memory.                                               |
 | `this_plugin` | When `true`, prefixes `session_id` with this plugin's name so two plugins using `"team_ct"` don't share the same memory. |
-| `no_memory` | When `true`, the query runs with no history and the response is not stored. |
+| `no_memory`   | When `true`, the query runs with no history and the response is not stored.                                              |
 
 Returns the queue slot index on success, or `-1` if the queue is full or the socket failed to open.
 
@@ -68,48 +68,48 @@ Returns the queue slot index on success, or `-1` if the queue is full or the soc
 // Team session - all CTs share one conversation
 new session[32];
 format(session, sizeof(session) - 1, "team_%d", get_user_team(id));
-genai_query("What is our team strategy?", "on_team_response", session);
+agent_query("What is our team strategy?", "on_team_response", session);
 
 // Server-wide session
-genai_query("Summarize the last round.", "on_summary", "server");
+agent_query("Summarize the last round.", "on_summary", "server");
 ```
 
 ---
 
-### genai_cancel
+### agent_cancel
 
 ```pawn
-native genai_cancel(player, const session_id[] = "");
+native agent_cancel(player, const session_id[] = "");
 ```
 
 Cancels any pending query for this player or session. No callback is fired.
 
 ---
 
-### genai_is_pending
+### agent_is_pending
 
 ```pawn
-native bool:genai_is_pending(player, const session_id[] = "");
+native bool:agent_is_pending(player, const session_id[] = "");
 ```
 
 Returns `true` if a query is currently in-flight for this player or session. The `session_id` defaults to the player's SteamID when empty.
 
 ---
 
-### genai_set_plugin_context
+### agent_set_plugin_context
 
 ```pawn
-native genai_set_plugin_context(const context[]);
+native agent_set_plugin_context(const context[]);
 ```
 
 Sets this plugin's context section. The text is appended to the immutable base system prompt under a `## <plugin_name>` heading - it cannot override the base. Replaces any previously set plugin context. Call in `plugin_init`.
 
 ---
 
-### genai_append_plugin_context
+### agent_append_plugin_context
 
 ```pawn
-native genai_append_plugin_context(const content[]);
+native agent_append_plugin_context(const content[]);
 ```
 
 Appends text to this plugin's context section. A newline is inserted between the existing content and the new text. Headings inside the content are shifted down two levels (`#` becomes `###`, `##` becomes `####`) so they nest correctly under the plugin's `##` section heading.
@@ -117,18 +117,18 @@ Appends text to this plugin's context section. A newline is inserted between the
 ```pawn
 public plugin_init()
 {
-    genai_set_plugin_context("You are a helpful assistant for this game server.");
-    genai_append_plugin_context("Always respond in one or two sentences.");
-    genai_append_plugin_context("Current map: de_dust2. Round budget: $3000.");
+    agent_set_plugin_context("You are a helpful assistant for this game server.");
+    agent_append_plugin_context("Always respond in one or two sentences.");
+    agent_append_plugin_context("Current map: de_dust2. Round budget: $3000.");
 }
 ```
 
 ---
 
-### genai_clear_memory
+### agent_clear_memory
 
 ```pawn
-native genai_clear_memory(player, const session_id[] = "");
+native agent_clear_memory(player, const session_id[] = "");
 ```
 
 Clears short-term memory (conversation turns) for a session. Call on player disconnect or when starting a new context. The `session_id` defaults to the player's SteamID when empty.
@@ -139,10 +139,10 @@ Memory is SQLite-backed and survives sidecar restarts.
 
 ---
 
-### genai_register_tool
+### agent_register_tool
 
 ```pawn
-native genai_register_tool(const name[], const description[], const callback[]);
+native agent_register_tool(const name[], const description[], const callback[]);
 ```
 
 Registers a tool the agent can call mid-reasoning. The agent sees `name` and `description` when deciding whether to use it. The callback is invoked synchronously when the agent requests the tool.
@@ -159,54 +159,54 @@ public my_tool(player, const args_json[], result[], maxlen)
 - `maxlen` - size of the result buffer.
 - Return `1` on success.
 
-Follow `genai_register_tool` immediately with `genai_add_tool_param` calls to declare expected arguments. Without parameter declarations the agent must guess the argument format from the description alone.
+Follow `agent_register_tool` immediately with `agent_add_tool_param` calls to declare expected arguments. Without parameter declarations the agent must guess the argument format from the description alone.
 
 ---
 
-### genai_add_tool_param
+### agent_add_tool_param
 
 ```pawn
-native genai_add_tool_param(const name[], const type[], bool:required, const description[]);
+native agent_add_tool_param(const name[], const type[], bool:required, const description[]);
 ```
 
-Adds a typed parameter to the most recently registered tool. Call immediately after `genai_register_tool`, once per parameter.
+Adds a typed parameter to the most recently registered tool. Call immediately after `agent_register_tool`, once per parameter.
 
-| Argument | Description |
-|----------|-------------|
-| `name` | Parameter name in `snake_case` |
-| `type` | JSON type: `"string"`, `"integer"`, `"boolean"`, or `"number"` |
-| `required` | `true` if the agent must always supply this argument |
-| `description` | One sentence telling the agent what this argument represents |
+| Argument      | Description                                                    |
+| ------------- | -------------------------------------------------------------- |
+| `name`        | Parameter name in `snake_case`                                 |
+| `type`        | JSON type: `"string"`, `"integer"`, `"boolean"`, or `"number"` |
+| `required`    | `true` if the agent must always supply this argument           |
+| `description` | One sentence telling the agent what this argument represents   |
 
 ```pawn
-genai_register_tool("get_player_info", "Returns info about a player", "tool_player_info");
-genai_add_tool_param("player_id",     "integer", true,  "Player index (1-32)");
-genai_add_tool_param("include_stats", "boolean", false, "Include frags, deaths, and assists");
+agent_register_tool("get_player_info", "Returns info about a player", "tool_player_info");
+agent_add_tool_param("player_id",     "integer", true,  "Player index (1-32)");
+agent_add_tool_param("include_stats", "boolean", false, "Include frags, deaths, and assists");
 ```
 
 ---
 
-### genai_clear_longterm_memory
+### agent_clear_longterm_memory
 
 ```pawn
-native genai_clear_longterm_memory(player, const session_id[] = "");
+native agent_clear_longterm_memory(player, const session_id[] = "");
 ```
 
-Deletes the long-term (summary) memory for a session without touching short-term memory. Unlike `genai_clear_memory`, no summarization is performed - the persistent summary is discarded entirely. Use for a full memory reset, e.g. at the start of a new season when past context is no longer relevant.
+Deletes the long-term (summary) memory for a session without touching short-term memory. Unlike `agent_clear_memory`, no summarization is performed - the persistent summary is discarded entirely. Use for a full memory reset, e.g. at the start of a new season when past context is no longer relevant.
 
 ---
 
-### genai_register_skill
+### agent_register_skill
 
 ```pawn
-native genai_register_skill(const name[]);
+native agent_register_skill(const name[]);
 ```
 
 Registers a skill directory the agent can use for all queries from the calling plugin. Call in `plugin_init`.
 
 The skill name is automatically prefixed with the plugin filename (minus `.amxx`) using a double underscore separator. A skill named `"strategy"` in `my_coach.amxx` is registered as `"my_coach__strategy"`. This prevents collisions between plugins.
 
-The sidecar resolves skills by looking for `<name>/SKILL.md` under `GENAI_SKILLS_PATH` (defaults to `~/.local/share/amxmodx_genai/skills`, overridden with the `GENAI_SKILLS_PATH` env var). Deploy the skill directory to that location on the sidecar machine.
+The sidecar resolves skills by looking for `<name>/SKILL.md` under `AGENT_SKILLS_PATH` (defaults to `~/.local/share/amxx_agent/skills`, overridden with the `AGENT_SKILLS_PATH` env var). Deploy the skill directory to that location on the sidecar machine.
 
 **Skill directory structure** (`skills/my_coach__strategy/`):
 
@@ -224,6 +224,7 @@ my_coach__strategy/
 name: my_coach__strategy
 description: Provides tactical strategy advice for the current map.
 ---
+
 When asked about strategy, analyze the current situation and suggest a plan.
 ```
 
@@ -232,16 +233,16 @@ The `name` field in the SKILL.md frontmatter must match the directory name exact
 ```pawn
 public plugin_init()
 {
-    genai_register_skill("strategy");   // -> my_coach__strategy
-    genai_register_skill("economy");    // -> my_coach__economy
+    agent_register_skill("strategy");   // -> my_coach__strategy
+    agent_register_skill("economy");    // -> my_coach__economy
 }
 ```
 
 **Built-in skills:**
 
-The core plugin optionally registers a built-in `amxmodx-reference` skill (controlled by `genai_core_skills` CVar, default `1`). This skill provides the agent with reference knowledge about AMX Mod X, Pawn scripting, server administration, and common gameplay systems. Plugins can also register their own skills or build on the reference skill.
+The core plugin optionally registers a built-in `amxmodx-reference` skill (controlled by `agent_core_skills` CVar, default `1`). This skill provides the agent with reference knowledge about AMX Mod X, Pawn scripting, server administration, and common gameplay systems. Plugins can also register their own skills or build on the reference skill.
 
-The `amxmodx-reference` skill is located at `plugins/amxmodx_genai/include/skills/amxmodx-reference/SKILL.md` in the plugin package. To use it, ensure `GENAI_SKILLS_PATH` (environment variable on the sidecar) points to the directory containing `amxmodx-reference/` (i.e., the `include/skills/` directory from the plugin package).
+The `amxmodx-reference` skill is located at `plugins/amxx_agent/include/skills/amxmodx-reference/SKILL.md` in the plugin package. To use it, ensure `AGENT_SKILLS_PATH` (environment variable on the sidecar) points to the directory containing `amxmodx-reference/` (i.e., the `include/skills/` directory from the plugin package).
 
 ---
 
@@ -249,17 +250,17 @@ The `amxmodx-reference` skill is located at `plugins/amxmodx_genai/include/skill
 
 ```pawn
 #include <amxmodx>
-#include <amxmodx_genai>
+#include <amxx_agent>
 
 public plugin_init()
 {
     register_plugin("My Plugin", "1.0.0", "me");
 
-    genai_set_plugin_context("You are a helpful assistant for this game server.");
-    genai_append_plugin_context("Keep answers brief: one or two sentences.");
+    agent_set_plugin_context("You are a helpful assistant for this game server.");
+    agent_append_plugin_context("Keep answers brief: one or two sentences.");
 
-    genai_register_tool("get_map", "Returns the current map name", "tool_get_map");
-    genai_register_skill("tactics");
+    agent_register_tool("get_map", "Returns the current map name", "tool_get_map");
+    agent_register_skill("tactics");
 
     register_clcmd("say /ask",  "cmd_ask");
     register_clcmd("say /team", "cmd_ask_team");
@@ -268,7 +269,7 @@ public plugin_init()
 // Per-player query - memory shared across all plugins
 public cmd_ask(id)
 {
-    if (genai_is_pending(id)) {
+    if (agent_is_pending(id)) {
         client_print(id, print_chat, "[AI] Still thinking...");
         return PLUGIN_HANDLED;
     }
@@ -282,7 +283,7 @@ public cmd_ask(id)
         return PLUGIN_HANDLED;
     }
 
-    genai_query_player(id, args, "on_response");
+    agent_query_player(id, args, "on_response");
     return PLUGIN_HANDLED;
 }
 
@@ -291,7 +292,7 @@ public cmd_ask_team(id)
 {
     new session[32];
     format(session, sizeof(session) - 1, "team_%d", get_user_team(id));
-    genai_query("What is our team strategy?", "on_team_response", session);
+    agent_query("What is our team strategy?", "on_team_response", session);
     return PLUGIN_HANDLED;
 }
 
@@ -319,14 +320,14 @@ public tool_get_map(player, const args[], result[], maxlen)
 
 public client_disconnect(id)
 {
-    genai_cancel(id);
-    genai_clear_memory(id);  // triggers long-term summarization
+    agent_cancel(id);
+    agent_clear_memory(id);  // triggers long-term summarization
 }
 ```
 
 ## Tool argument parsing
 
-When the agent calls a tool, `args_json` is a flat JSON object. Use the helpers from `json.inc` (in `amxmodx_genai/include/`):
+When the agent calls a tool, `args_json` is a flat JSON object. Use the helpers from `json.inc` (in `amxx_agent/include/`):
 
 ```pawn
 #include <json>
@@ -361,18 +362,18 @@ The sidecar always uses its base `SYSTEM_PROMPT.md` - this cannot be overridden.
 <your plugin context here>
 ```
 
-Build domain knowledge into `genai_set_plugin_context` / `genai_append_plugin_context`. Headings inside your context text start at `###` automatically.
+Build domain knowledge into `agent_set_plugin_context` / `agent_append_plugin_context`. Headings inside your context text start at `###` automatically.
 
 ## Limits
 
-| Constant | Default | Description |
-|----------|---------|-------------|
-| `MAX_QUEUE` | 32 | Concurrent in-flight queries |
-| `MAX_TOOLS` | 32 | Registered tools across all plugins |
-| `MAX_SKILLS` | 32 | Registered skills across all plugins |
-| `MAX_SESSION_ID` | 64 | Session ID string length |
-| `MAX_PROMPT` | 8192 | Prompt string length |
-| `MAX_RESPONSE` | 4096 | Response / tool result buffer |
-| `MAX_SYSTEM` | 8192 | System prompt context length (per plugin) |
+| Constant         | Default | Description                               |
+| ---------------- | ------- | ----------------------------------------- |
+| `MAX_QUEUE`      | 32      | Concurrent in-flight queries              |
+| `MAX_TOOLS`      | 32      | Registered tools across all plugins       |
+| `MAX_SKILLS`     | 32      | Registered skills across all plugins      |
+| `MAX_SESSION_ID` | 64      | Session ID string length                  |
+| `MAX_PROMPT`     | 8192    | Prompt string length                      |
+| `MAX_RESPONSE`   | 4096    | Response / tool result buffer             |
+| `MAX_SYSTEM`     | 8192    | System prompt context length (per plugin) |
 
-These are defined in `plugins/amxmodx_genai/include/constants.inc`.
+These are defined in `plugins/amxx_agent/include/constants.inc`.

@@ -4,17 +4,17 @@
 // each one over the wire without running a real game server.
 //
 // Covered natives:
-//   genai_set_plugin_context        - set in plugin_init
-//   genai_append_plugin_context     - append in plugin_init
-//   genai_register_tool             - three tools registered
-//   genai_add_tool_param            - params declared for set_value / get_value
-//   genai_register_skill            - registers "testable-knowledge" skill
-//   genai_query                     - server-session query (say /test_ask)
-//   genai_query_player              - player-scoped query  (say /test_ask_player)
-//   genai_is_pending                - checked before every query; tested via get_pending
-//   genai_cancel                    - say /test_cancel
-//   genai_clear_memory              - say /test_clear
-//   genai_clear_longterm_memory     - say /test_clear_longterm
+//   agent_set_plugin_context        - set in plugin_init
+//   agent_append_plugin_context     - append in plugin_init
+//   agent_register_tool             - three tools registered
+//   agent_add_tool_param            - params declared for set_value / get_value
+//   agent_register_skill            - registers "testable-knowledge" skill
+//   agent_query                     - server-session query (say /test_ask)
+//   agent_query_player              - player-scoped query  (say /test_ask_player)
+//   agent_is_pending                - checked before every query; tested via get_pending
+//   agent_cancel                    - say /test_cancel
+//   agent_clear_memory              - say /test_clear
+//   agent_clear_longterm_memory     - say /test_clear_longterm
 //
 // Observable side effects tests can check:
 //   [TESTABLE] response: <text>
@@ -24,12 +24,12 @@
 // The matching integration test is tests/integration/test_example_testable.py.
 
 #include <amxmodx>
-#include <amxmodx_genai>
+#include <amxx_agent>
 #include <json>
 
 #define PLUGIN    "AI Testable Example"
 #define VERSION   "1.0.0"
-#define AUTHOR    "amxmodx-genai"
+#define AUTHOR    "amxx-agent"
 
 #define SESSION_ID    "testable"
 #define MAX_LOG_LINES 64
@@ -44,7 +44,7 @@ new g_szKVKey[32][64];
 new g_szKVVal[32][256];
 new g_iKVCount;
 
-// Tracks the queue slot returned by the last genai_query / genai_query_player
+// Tracks the queue slot returned by the last agent_query / agent_query_player
 // call so that tests probing "is_pending" have a meaningful state to observe.
 new g_iLastSlot;
 
@@ -58,42 +58,42 @@ public plugin_init()
     register_clcmd("say /test_clear",          "cmd_test_clear");
     register_clcmd("say /test_clear_longterm", "cmd_test_clear_longterm");
 
-    // System prompt context (genai_set_plugin_context + genai_append_plugin_context).
-    genai_set_plugin_context("You are a test harness assistant. Use the available tools when asked to store, retrieve, or inspect data.");
-    genai_append_plugin_context("Tools: get_log (read event log), set_value (store key/value), get_value (read key/value), get_pending (check whether a query slot is pending).");
+    // System prompt context (agent_set_plugin_context + agent_append_plugin_context).
+    agent_set_plugin_context("You are a test harness assistant. Use the available tools when asked to store, retrieve, or inspect data.");
+    agent_append_plugin_context("Tools: get_log (read event log), set_value (store key/value), get_value (read key/value), get_pending (check whether a query slot is pending).");
 
     // Register the testable-knowledge skill.
     // Skill directory: examples/testable/skills/ai_testable__testable-knowledge/
-    // Deploy to GENAI_SKILLS_PATH on the sidecar host before using.
-    genai_register_skill("testable-knowledge");
+    // Deploy to AGENT_SKILLS_PATH on the sidecar host before using.
+    agent_register_skill("testable-knowledge");
 
     // Tool: read the accumulated log lines.
-    genai_register_tool(
+    agent_register_tool(
         "get_log",
         "Returns all log entries recorded by this plugin since it started as a JSON array of strings.",
         "tool_get_log"
     );
 
     // Tool: store a key-value pair.
-    genai_register_tool(
+    agent_register_tool(
         "set_value",
         "Stores a named value in the plugin's key-value store.",
         "tool_set_value"
     );
-    genai_add_tool_param("key",   "string", true,  "Storage key (alphanumeric, no spaces)");
-    genai_add_tool_param("value", "string", true,  "Value to store");
+    agent_add_tool_param("key",   "string", true,  "Storage key (alphanumeric, no spaces)");
+    agent_add_tool_param("value", "string", true,  "Value to store");
 
     // Tool: read a previously stored value.
-    genai_register_tool(
+    agent_register_tool(
         "get_value",
         "Retrieves a value from the plugin's key-value store.",
         "tool_get_value"
     );
-    genai_add_tool_param("key", "string", true, "Storage key to look up");
+    agent_add_tool_param("key", "string", true, "Storage key to look up");
 
     // Tool: return whether any query slot is currently pending.
-    // Tests use this to exercise genai_is_pending indirectly via the wire.
-    genai_register_tool(
+    // Tests use this to exercise agent_is_pending indirectly via the wire.
+    agent_register_tool(
         "get_pending",
         "Returns whether a query is currently in-flight for the server session.",
         "tool_get_pending"
@@ -104,7 +104,7 @@ public plugin_init()
 
 // ---- commands ---------------------------------------------------------------
 
-// genai_query - server-scoped session (no player index, explicit session_id).
+// agent_query - server-scoped session (no player index, explicit session_id).
 public cmd_test_ask(player)
 {
     new args[512];
@@ -113,17 +113,17 @@ public cmd_test_ask(player)
     if (!args[0])
         return PLUGIN_HANDLED;
 
-    if (genai_is_pending(0, SESSION_ID)) {
+    if (agent_is_pending(0, SESSION_ID)) {
         _log("ask_blocked: already_pending");
         return PLUGIN_HANDLED;
     }
 
     _log("query: %s", args);
-    g_iLastSlot = genai_query(args, "on_test_response", SESSION_ID, true);
+    g_iLastSlot = agent_query(args, "on_test_response", SESSION_ID, true);
     return PLUGIN_HANDLED;
 }
 
-// genai_query_player - per-player scoped session (this_plugin=true).
+// agent_query_player - per-player scoped session (this_plugin=true).
 public cmd_test_ask_player(player)
 {
     new args[512];
@@ -132,43 +132,43 @@ public cmd_test_ask_player(player)
     if (!args[0])
         return PLUGIN_HANDLED;
 
-    if (genai_is_pending(player)) {
+    if (agent_is_pending(player)) {
         _log("ask_player_blocked: already_pending player=%d", player);
         return PLUGIN_HANDLED;
     }
 
     _log("query_player: player=%d prompt=%s", player, args);
-    g_iLastSlot = genai_query_player(player, args, "on_player_response", true);
+    g_iLastSlot = agent_query_player(player, args, "on_player_response", true);
     return PLUGIN_HANDLED;
 }
 
-// genai_cancel - cancel the in-flight server-session query.
+// agent_cancel - cancel the in-flight server-session query.
 public cmd_test_cancel(player)
 {
     _log("cancel: session=%s", SESSION_ID);
-    genai_cancel(0, SESSION_ID);
+    agent_cancel(0, SESSION_ID);
     return PLUGIN_HANDLED;
 }
 
-// genai_clear_memory - wipe short-term memory (triggers long-term summarization).
+// agent_clear_memory - wipe short-term memory (triggers long-term summarization).
 public cmd_test_clear(player)
 {
     _log("clear_memory: session=%s", SESSION_ID);
-    genai_clear_memory(0, SESSION_ID);
+    agent_clear_memory(0, SESSION_ID);
     return PLUGIN_HANDLED;
 }
 
-// genai_clear_longterm_memory - discard the long-term summary without summarizing.
+// agent_clear_longterm_memory - discard the long-term summary without summarizing.
 public cmd_test_clear_longterm(player)
 {
     _log("clear_longterm: session=%s", SESSION_ID);
-    genai_clear_longterm_memory(0, SESSION_ID);
+    agent_clear_longterm_memory(0, SESSION_ID);
     return PLUGIN_HANDLED;
 }
 
 // ---- response callbacks -----------------------------------------------------
 
-// genai_query callback - no player argument.
+// agent_query callback - no player argument.
 public on_test_response(const response[], bool:is_error)
 {
     if (is_error) {
@@ -181,7 +181,7 @@ public on_test_response(const response[], bool:is_error)
     log_amx("[TESTABLE] response: %s", response);
 }
 
-// genai_query_player callback - receives player index.
+// agent_query_player callback - receives player index.
 public on_player_response(player, const response[], bool:is_error)
 {
     if (is_error) {
@@ -275,10 +275,10 @@ public tool_get_value(player, const args_json[], result[], maxlen)
     return 1;
 }
 
-// Exposes genai_is_pending state to the wire so tests can verify it.
+// Exposes agent_is_pending state to the wire so tests can verify it.
 public tool_get_pending(player, const args_json[], result[], maxlen)
 {
-    new bool:pending = genai_is_pending(0, SESSION_ID);
+    new bool:pending = agent_is_pending(0, SESSION_ID);
     log_amx("[TESTABLE] tool_called: get_pending -> %d", pending ? 1 : 0);
     format(result, maxlen, "{^"pending^":%s}", pending ? "true" : "false");
     return 1;

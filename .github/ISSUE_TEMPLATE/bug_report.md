@@ -19,7 +19,7 @@ labels: bug
 - AMXMODX version:
 - OS:
 - Python version:
-- `GENAI_MODEL`:
+- `AGENT_MODEL`:
 
 ## Logs
 

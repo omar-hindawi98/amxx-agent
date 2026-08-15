@@ -3,8 +3,8 @@
 ## Getting started
 
 ```sh
-git clone https://github.com/omar-hindawi98/amxmodx-genai.git
-cd amxmodx-genai
+git clone https://github.com/omar-hindawi98/amxx-agent.git
+cd amxx-agent
 uv sync --dev
 ```
 
@@ -18,7 +18,7 @@ uv run pytest tests/unit     # unit tests (no API key, no network)
 uv run pytest tests/         # unit + integration (Ollama-dependent tests auto-skip when Ollama is unreachable)
 ```
 
-Integration tests use a real Ollama instance when reachable at `GENAI_MODEL_ENDPOINT`
+Integration tests use a real Ollama instance when reachable at `AGENT_MODEL_ENDPOINT`
 (default `http://localhost:11434`). Tests marked with `@requires_ollama` are skipped
 automatically when Ollama is not available, so no API key or network access is needed for
 the rest of the suite.
@@ -28,7 +28,7 @@ the rest of the suite.
 Run the live sidecar tests against a real API key:
 
 ```sh
-GENAI_MODEL_API_KEY=sk-ant-... uv run pytest tests/integration/test_live_sidecar.py
+AGENT_MODEL_API_KEY=sk-ant-... uv run pytest tests/integration/test_live_sidecar.py
 ```
 
 ### Docker e2e
@@ -71,7 +71,7 @@ Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
 
 ```
 plugins/
-  amxmodx_genai/
+  amxx_agent/
     core.sma                 - AMX Mod X core plugin (natives, TCP queue, poll loop)
     include/
       constants.inc          - Shared #define limits
@@ -81,18 +81,18 @@ plugins/
       core_skills.inc        - Built-in skill registration
       skills/                - Bundled skill directories (e.g. amxmodx-reference)
   include/
-    amxmodx_genai.inc        - Public native declarations for third-party plugins
+    amxx_agent.inc        - Public native declarations for third-party plugins
 examples/
-  weapon_advisor/            - genai_register_skill + custom tool + per-player memory
+  weapon_advisor/            - agent_register_skill + custom tool + per-player memory
     skills/                  - Skill directory shipped with this plugin
   admin_assistant/           - All main API functions: tools, skill, cancel, clear_longterm
     skills/                  - Skill directory shipped with this plugin
   testable/                  - All plugin API natives; observable for integration testing
     skills/                  - Skill directory shipped with this plugin
-src/amxmodx_genai/
+src/amxx_agent/
   server.py                  - asyncio TCP listener entry point
-  config.py                  - Pydantic settings (GENAI_* env vars)
-  logger.py                  - Logging configuration (level from GENAI_LOG_LEVEL)
+  config.py                  - Pydantic settings (AGENT_* env vars)
+  logger.py                  - Logging configuration (level from AGENT_LOG_LEVEL)
   SYSTEM_PROMPT.md           - Immutable base agent persona
   core/
     handler.py               - Per-connection coroutine: agent loop, memory, framing

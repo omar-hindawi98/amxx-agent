@@ -9,25 +9,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """All runtime configuration for the GenAI sidecar.
 
-    GENAI_* environment variables (or .env file) override the defaults below.
+    AGENT_* environment variables (or .env file) override the defaults below.
 
     Server:
-      GENAI_HOST, GENAI_PORT, GENAI_MAX_CONCURRENT, GENAI_REQUEST_TIMEOUT_SECONDS,
-      GENAI_AUTH_TOKEN
+      AGENT_HOST, AGENT_PORT, AGENT_MAX_CONCURRENT, AGENT_REQUEST_TIMEOUT_SECONDS,
+      AGENT_AUTH_TOKEN
 
     Model:
-      GENAI_MODEL_BACKEND, GENAI_MODEL_NAME, GENAI_MODEL_TOKENS,
-      GENAI_MODEL_ENDPOINT, GENAI_MODEL_API_KEY
+      AGENT_MODEL_BACKEND, AGENT_MODEL_NAME, AGENT_MODEL_TOKENS,
+      AGENT_MODEL_ENDPOINT, AGENT_MODEL_API_KEY
 
     Memory:
-      GENAI_MEMORY_MAX_MESSAGES, GENAI_MEMORY_PATH
+      AGENT_MEMORY_MAX_MESSAGES, AGENT_MEMORY_PATH
 
     Skills:
-      GENAI_SKILLS_PATH
+      AGENT_SKILLS_PATH
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="GENAI_",
+        env_prefix="AGENT_",
         env_file=".env",
         env_file_encoding="utf-8",
     )
@@ -64,8 +64,8 @@ class Settings(BaseSettings):
         """Lowercase the backend name so 'Ollama' and 'OLLAMA' both work."""
         return str(v).lower()
 
-    memory_path: Path = Path.home() / ".local" / "share" / "amxmodx_genai" / "memory.db"
-    skills_path: Path = Path.home() / ".local" / "share" / "amxmodx_genai" / "skills"
+    memory_path: Path = Path.home() / ".local" / "share" / "amxx_agent" / "memory.db"
+    skills_path: Path = Path.home() / ".local" / "share" / "amxx_agent" / "skills"
 
 
 settings = Settings()

@@ -11,8 +11,8 @@ from tests.integration.helpers import make_agent_result
 
 
 def _get_persistent():
-    import amxmodx_genai.server as srv_mod
-    from amxmodx_genai.server import _handle_persistent
+    import amxx_agent.server as srv_mod
+    from amxx_agent.server import _handle_persistent
 
     # Ensure semaphore is initialized
     if srv_mod._sem is None:
@@ -40,7 +40,9 @@ async def _read_frames_until_done(
     while True:
         remaining = deadline - asyncio.get_event_loop().time()
         if remaining <= 0:
-            raise TimeoutError(f"timed out waiting for done frame for {request_id}; got {frames}")
+            raise TimeoutError(
+                f"timed out waiting for done frame for {request_id}; got {frames}"
+            )
         raw = await asyncio.wait_for(reader.readline(), timeout=remaining)
         if not raw:
             break
@@ -61,7 +63,7 @@ async def _read_frames_until_done(
 @pytest.mark.asyncio
 async def test_persistent_single_query_returns_frames(unused_tcp_port):
     """A single query over a persistent connection returns response + done."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -100,7 +102,7 @@ async def test_persistent_single_query_returns_frames(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_persistent_multiplexed_two_queries(unused_tcp_port):
     """Two concurrent queries on one persistent connection both complete correctly."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -130,8 +132,10 @@ async def test_persistent_multiplexed_two_queries(unused_tcp_port):
             inst.invoke_async = AsyncMock(side_effect=fast_invoke_r2)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
 
@@ -179,9 +183,13 @@ async def test_persistent_multiplexed_two_queries(unused_tcp_port):
     r1_frames = [f for f in all_frames if f.get("request_id") == "r1"]
     r2_frames = [f for f in all_frames if f.get("request_id") == "r2"]
 
-    assert any(f["type"] == "response" for f in r1_frames), f"no response for r1: {r1_frames}"
+    assert any(
+        f["type"] == "response" for f in r1_frames
+    ), f"no response for r1: {r1_frames}"
     assert any(f["type"] == "done" for f in r1_frames), f"no done for r1: {r1_frames}"
-    assert any(f["type"] == "response" for f in r2_frames), f"no response for r2: {r2_frames}"
+    assert any(
+        f["type"] == "response" for f in r2_frames
+    ), f"no response for r2: {r2_frames}"
     assert any(f["type"] == "done" for f in r2_frames), f"no done for r2: {r2_frames}"
 
     # Each request_id's response frame carries the text from its own agent invocation.
@@ -202,7 +210,7 @@ async def test_persistent_multiplexed_two_queries(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_persistent_orphan_tool_result_does_not_crash(unused_tcp_port):
     """A tool_result frame with an unknown request_id is logged and silently dropped."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -249,14 +257,16 @@ async def test_persistent_orphan_tool_result_does_not_crash(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_persistent_tool_result_routed_to_correct_handler(unused_tcp_port):
     """tool_result frames are routed by request_id to the waiting handler."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
 
     async def mock_call(name, args, send, tool_result_queue, request_id, session_data):
         # Record what tool call frame was sent by inspecting queue; just return a canned result
-        session_data.setdefault("calls", []).append({"tool": name, "args": args, "result": "42"})
+        session_data.setdefault("calls", []).append(
+            {"tool": name, "args": args, "result": "42"}
+        )
         return "42"
 
     def make_agent(**kwargs):
@@ -273,10 +283,12 @@ async def test_persistent_tool_result_routed_to_correct_handler(unused_tcp_port)
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.tools.plugin._call", side_effect=mock_call),
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.tools.plugin._call", side_effect=mock_call),
     ):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
             await _send_msg(
@@ -305,7 +317,7 @@ async def test_persistent_tool_result_routed_to_correct_handler(unused_tcp_port)
 @pytest.mark.asyncio
 async def test_persistent_disconnect_cancels_in_flight_tasks(unused_tcp_port):
     """When the client disconnects mid-query, in-flight tasks are cancelled cleanly."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -325,8 +337,10 @@ async def test_persistent_disconnect_cancels_in_flight_tasks(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=hanging_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
             await _send_msg(
@@ -361,7 +375,7 @@ async def test_persistent_disconnect_cancels_in_flight_tasks(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_persistent_unknown_message_type_ignored(unused_tcp_port):
     """An unrecognised message type is logged and the connection remains usable."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -402,7 +416,7 @@ async def test_persistent_unknown_message_type_ignored(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_persistent_bad_json_skipped_connection_survives(unused_tcp_port):
     """A malformed JSON line is skipped and the connection remains usable."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -443,13 +457,17 @@ async def test_persistent_bad_json_skipped_connection_survives(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_persistent_clear_memory_sends_done(unused_tcp_port):
     """clear_memory over a persistent connection sends a done frame."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
 
-    with patch("amxmodx_genai.core.handler.summarize_session", new=AsyncMock(return_value="")):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch(
+        "amxx_agent.core.handler.summarize_session", new=AsyncMock(return_value="")
+    ):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             reader, writer = await _open_persistent(unused_tcp_port)
             await _send_msg(

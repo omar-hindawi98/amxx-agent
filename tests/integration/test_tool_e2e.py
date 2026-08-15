@@ -15,8 +15,8 @@ from tests.integration.helpers import make_agent_result
 
 
 def _get_persistent():
-    import amxmodx_genai.server as srv_mod
-    from amxmodx_genai.server import _handle_persistent
+    import amxx_agent.server as srv_mod
+    from amxx_agent.server import _handle_persistent
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -89,8 +89,10 @@ async def test_real_tool_roundtrip_over_wire(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             frames = await _run_with_tool_responses(
                 unused_tcp_port,
@@ -145,8 +147,10 @@ async def test_two_tools_called_sequentially(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             frames = await _run_with_tool_responses(
                 unused_tcp_port,
@@ -199,7 +203,7 @@ async def test_two_tools_called_sequentially(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_tool_result_truncated_at_limit(unused_tcp_port):
     """Tool results larger than _MAX_TOOL_RESULT_BYTES are truncated before reaching the Agent."""
-    from amxmodx_genai.tools.plugin import _MAX_TOOL_RESULT_BYTES
+    from amxx_agent.tools.plugin import _MAX_TOOL_RESULT_BYTES
 
     large_payload = "Z" * (_MAX_TOOL_RESULT_BYTES + 500)
     agent_received: list[str] = []
@@ -216,8 +220,10 @@ async def test_tool_result_truncated_at_limit(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _run_with_tool_responses(
                 unused_tcp_port,
@@ -226,7 +232,9 @@ async def test_tool_result_truncated_at_limit(unused_tcp_port):
                     "request_id": "r1",
                     "player": 1,
                     "prompt": "call big tool",
-                    "tools": [{"name": "big_tool", "description": "returns large payload"}],
+                    "tools": [
+                        {"name": "big_tool", "description": "returns large payload"}
+                    ],
                 },
                 {"big_tool": large_payload},
             )
@@ -244,7 +252,7 @@ async def test_tool_result_truncated_at_limit(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_tool_call_result_stored_in_memory(unused_tcp_port):
     """After a query with a tool call, the exchange is written to memory."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     def make_agent(**kwargs):
         inst = MagicMock()
@@ -257,8 +265,10 @@ async def test_tool_call_result_stored_in_memory(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _run_with_tool_responses(
                 unused_tcp_port,

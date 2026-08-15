@@ -31,8 +31,8 @@ async def test_plugin_tool_registered_in_agent_kwargs(unused_tcp_port):
         return '{"health":100}'
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.tools.plugin._call", side_effect=mock_call),
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.tools.plugin._call", side_effect=mock_call),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -94,8 +94,8 @@ async def test_plugin_tool_result_reaches_agent(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.tools.plugin._call", side_effect=mock_call),
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.tools.plugin._call", side_effect=mock_call),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -134,7 +134,9 @@ async def test_plugin_tool_calls_recorded_in_session_data(unused_tcp_port):
     captured_session_data: dict = {}
 
     async def mock_call(name, args, send, tool_result_queue, request_id, session_data):
-        session_data.setdefault("calls", []).append({"tool": name, "args": args, "result": "ok"})
+        session_data.setdefault("calls", []).append(
+            {"tool": name, "args": args, "result": "ok"}
+        )
         captured_session_data.update(session_data)
         return "ok"
 
@@ -151,8 +153,8 @@ async def test_plugin_tool_calls_recorded_in_session_data(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.tools.plugin._call", side_effect=mock_call),
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.tools.plugin._call", side_effect=mock_call),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:

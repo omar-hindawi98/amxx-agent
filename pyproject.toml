@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "amxmodx_genai"
+name = "amxx_agent"
 version = "1.0.0"
 description = "LLM agent bridge for AMXMODX game servers"
 requires-python = ">=3.11"
@@ -16,7 +16,7 @@ dependencies = [
 
 
 [project.scripts]
-genai-sidecar = "amxmodx_genai.server:serve_cli"
+agent-sidecar = "amxx_agent.server:serve_cli"
 
 [dependency-groups]
 dev = [
@@ -32,7 +32,7 @@ testpaths = ["tests"]
 addopts = "-n auto"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/amxmodx_genai"]
+packages = ["src/amxx_agent"]
 
 [tool.ruff]
 line-length = 100

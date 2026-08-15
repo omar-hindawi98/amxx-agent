@@ -10,7 +10,7 @@ Strands tools require a JSON Schema `inputSchema` so the model receives proper t
 
 ## Decision
 
-Use a builder pattern: `genai_register_tool` registers the tool and sets it as the current tool being built. Subsequent `genai_add_tool_param(name, type, required, description)` calls append parameters to it. The sidecar converts the accumulated parameter list into a proper JSON Schema `inputSchema` when the tool is first used.
+Use a builder pattern: `agent_register_tool` registers the tool and sets it as the current tool being built. Subsequent `agent_add_tool_param(name, type, required, description)` calls append parameters to it. The sidecar converts the accumulated parameter list into a proper JSON Schema `inputSchema` when the tool is first used.
 
 Supported types: `"string"`, `"integer"`, `"boolean"`, `"number"`.
 
@@ -24,5 +24,5 @@ Supported types: `"string"`, `"integer"`, `"boolean"`, `"number"`.
 
 - Plugin authors declare parameters in a natural, linear style without writing JSON.
 - The model receives proper type constraints and required/optional distinctions.
-- The "current tool" state means `genai_add_tool_param` must be called immediately after `genai_register_tool`, before any other `genai_register_tool` call. This is documented but not enforced at runtime.
-- Tools with no `genai_add_tool_param` calls are valid (zero-parameter tools).
+- The "current tool" state means `agent_add_tool_param` must be called immediately after `agent_register_tool`, before any other `agent_register_tool` call. This is documented but not enforced at runtime.
+- Tools with no `agent_add_tool_param` calls are valid (zero-parameter tools).

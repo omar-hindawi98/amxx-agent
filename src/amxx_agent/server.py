@@ -7,11 +7,11 @@ import logging
 import signal
 from typing import Any
 
-from amxmodx_genai.config import settings
-from amxmodx_genai.core import memory
-from amxmodx_genai.core.handler import handle
-from amxmodx_genai.core.model import validate as validate_model
-from amxmodx_genai.core.protocol import send_json
+from amxx_agent.config import settings
+from amxx_agent.core import memory
+from amxx_agent.core.handler import handle
+from amxx_agent.core.model import validate as validate_model
+from amxx_agent.core.protocol import send_json
 
 log = logging.getLogger(__name__)
 
@@ -102,7 +102,11 @@ async def _handle_persistent(
                 await send({"type": "done", "request_id": request_id})
 
     finally:
-        log.info("plugin disconnected from %s, cancelling %d in-flight tasks", addr, len(in_flight))
+        log.info(
+            "plugin disconnected from %s, cancelling %d in-flight tasks",
+            addr,
+            len(in_flight),
+        )
         for t in in_flight:
             t.cancel()
         if in_flight:
@@ -174,11 +178,13 @@ async def _track(coro: Any) -> None:
 
 
 async def _vacuum_loop() -> None:
-    """Periodically remove sessions inactive beyond GENAI_MEMORY_SESSION_TTL_DAYS."""
+    """Periodically remove sessions inactive beyond AGENT_MEMORY_SESSION_TTL_DAYS."""
     while True:
         await asyncio.sleep(3600)
         try:
-            removed = await asyncio.to_thread(memory.vacuum, settings.memory_session_ttl_days)
+            removed = await asyncio.to_thread(
+                memory.vacuum, settings.memory_session_ttl_days
+            )
             if removed:
                 log.info(
                     "vacuumed %d stale sessions (ttl=%d days)",
@@ -201,7 +207,9 @@ async def serve() -> None:
 
     if settings.memory_session_ttl_days > 0:
         asyncio.create_task(_vacuum_loop(), name="vacuum")
-        log.info("session vacuum enabled (ttl=%d days)", settings.memory_session_ttl_days)
+        log.info(
+            "session vacuum enabled (ttl=%d days)", settings.memory_session_ttl_days
+        )
 
     async def _handler(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
         await _track(_handle_persistent(r, w))
@@ -234,7 +242,7 @@ async def serve() -> None:
 
 def serve_cli() -> None:
     """Configure logging and run the server from CLI."""
-    from amxmodx_genai.logger import setup as setup_logging
+    from amxx_agent.logger import setup as setup_logging
 
     setup_logging()
     asyncio.run(serve())

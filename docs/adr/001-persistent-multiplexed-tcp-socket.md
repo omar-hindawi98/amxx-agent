@@ -12,7 +12,7 @@ Opening one connection per query would require managing concurrent non-blocking 
 
 ## Decision
 
-Use a single persistent TCP connection that multiplexes all queries using a `request_id` field. The connection is opened on the first `genai_query` call and held open until the plugin shuts down or an error occurs. The AMX Mod X poll task reads all complete JSON lines per tick and dispatches each frame to the correct handler by `request_id`. The queue slot is freed when a `type=done` frame arrives for that `request_id`.
+Use a single persistent TCP connection that multiplexes all queries using a `request_id` field. The connection is opened on the first `agent_query` call and held open until the plugin shuts down or an error occurs. The AMX Mod X poll task reads all complete JSON lines per tick and dispatches each frame to the correct handler by `request_id`. The queue slot is freed when a `type=done` frame arrives for that `request_id`.
 
 ## Alternatives Considered
 
@@ -25,5 +25,5 @@ Use a single persistent TCP connection that multiplexes all queries using a `req
 
 - All message types (`query`, `tool_call`, `tool_result`, `response`, `done`, `clear_memory`) carry `request_id` for consistent multiplexing.
 - A single connection failure affects all in-flight queries. The plugin drops them and re-opens on the next call.
-- The poll task is only active while queries are in flight; it stops when the queue empties and restarts on the next `genai_query`.
-- Concurrency is controlled at two levels: a per-session semaphore (one in-flight request per `session_id` at a time) prevents a single session from starving others; a global semaphore (`GENAI_MAX_CONCURRENT`) caps total concurrent LLM calls to avoid API rate limits. Requests that cannot acquire a slot wait rather than being dropped.
+- The poll task is only active while queries are in flight; it stops when the queue empties and restarts on the next `agent_query`.
+- Concurrency is controlled at two levels: a per-session semaphore (one in-flight request per `session_id` at a time) prevents a single session from starving others; a global semaphore (`AGENT_MAX_CONCURRENT`) caps total concurrent LLM calls to avoid API rate limits. Requests that cannot acquire a slot wait rather than being dropped.

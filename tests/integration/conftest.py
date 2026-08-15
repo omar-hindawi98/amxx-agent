@@ -15,8 +15,8 @@ from tests.integration.helpers import (
 
 __all__ = ["get_handle", "make_agent_factory", "make_agent_result", "tcp_exchange"]
 
-_OLLAMA_ENDPOINT = os.environ.get("GENAI_MODEL_ENDPOINT", "http://localhost:11434")
-_OLLAMA_MODEL = os.environ.get("GENAI_MODEL_NAME", "llama3.2:1b")
+_OLLAMA_ENDPOINT = os.environ.get("AGENT_MODEL_ENDPOINT", "http://localhost:11434")
+_OLLAMA_MODEL = os.environ.get("AGENT_MODEL_NAME", "llama3.2:1b")
 
 
 def _ollama_reachable() -> bool:
@@ -38,19 +38,19 @@ requires_ollama = pytest.mark.skipif(
 @pytest.fixture(autouse=True)
 def fresh_memory(tmp_path):
     db_file = str(tmp_path / "integration_memory.db")
-    os.environ["GENAI_MEMORY_PATH"] = db_file
+    os.environ["AGENT_MEMORY_PATH"] = db_file
     if _ollama_available:
-        os.environ["GENAI_MODEL_BACKEND"] = "ollama"
-        os.environ["GENAI_MODEL_NAME"] = _OLLAMA_MODEL
-        os.environ["GENAI_MODEL_ENDPOINT"] = _OLLAMA_ENDPOINT
+        os.environ["AGENT_MODEL_BACKEND"] = "ollama"
+        os.environ["AGENT_MODEL_NAME"] = _OLLAMA_MODEL
+        os.environ["AGENT_MODEL_ENDPOINT"] = _OLLAMA_ENDPOINT
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
     yield
-    del os.environ["GENAI_MEMORY_PATH"]
-    os.environ.pop("GENAI_MODEL_BACKEND", None)
-    os.environ.pop("GENAI_MODEL_NAME", None)
-    os.environ.pop("GENAI_MODEL_ENDPOINT", None)
+    del os.environ["AGENT_MEMORY_PATH"]
+    os.environ.pop("AGENT_MODEL_BACKEND", None)
+    os.environ.pop("AGENT_MODEL_NAME", None)
+    os.environ.pop("AGENT_MODEL_ENDPOINT", None)
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]

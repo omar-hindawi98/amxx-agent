@@ -10,7 +10,7 @@ from tests.integration.helpers import get_handle
 
 
 def _mem():
-    import amxmodx_genai.core.memory as m
+    import amxx_agent.core.memory as m
 
     return m
 
@@ -19,7 +19,10 @@ async def _send_clear(port: int, session_id: str, player: int = 1) -> None:
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     writer.write(
         (
-            json.dumps({"type": "clear_memory", "player": player, "session_id": session_id}) + "\n"
+            json.dumps(
+                {"type": "clear_memory", "player": player, "session_id": session_id}
+            )
+            + "\n"
         ).encode()
     )
     await writer.drain()
@@ -41,7 +44,7 @@ async def test_summarize_called_with_session_history(unused_tcp_port):
     expected_history = mem.get("s1")
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value="- Prefers AK47"),
     ) as mock_summarize:
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -60,7 +63,7 @@ async def test_empty_history_skips_summarize(unused_tcp_port):
     assert mem.get("no_history") == []
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value=""),
     ) as mock_summarize:
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -78,7 +81,7 @@ async def test_prior_longterm_passed_to_summarize(unused_tcp_port):
     mem.set_longterm("s2", "- Player saves when low on cash")
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value="- updated"),
     ) as mock_summarize:
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -102,7 +105,7 @@ async def test_summary_stored_as_longterm_after_clear(unused_tcp_port):
     mem.update("s3", "rush B?", "Yes rush B.")
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value="- Aggressive playstyle"),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -119,7 +122,7 @@ async def test_empty_summary_not_stored(unused_tcp_port):
     mem.update("s4", "hello", "world")
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value=""),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -137,7 +140,7 @@ async def test_short_term_always_cleared_regardless_of_summary(unused_tcp_port):
     assert mem.get("s5") != []
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value="- some summary"),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -154,7 +157,7 @@ async def test_longterm_updated_not_replaced_on_second_clear(unused_tcp_port):
     mem.update("s6", "hello", "world")
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value="- first summary"),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -166,7 +169,7 @@ async def test_longterm_updated_not_replaced_on_second_clear(unused_tcp_port):
     mem.update("s6", "second prompt", "second reply")
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value="- merged summary"),
     ) as mock_summarize:
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)

@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from amxmodx_genai.config import settings
+from amxx_agent.config import settings
 
 _FORMAT = "%(asctime)s %(levelname)-8s %(name)s %(message)s"
 _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"

@@ -8,7 +8,7 @@ Covered functionality:
   - set_value tool: AI stores a key-value pair; test confirms correct args received
   - get_value tool: AI reads a previously set value; test confirms it got it back
   - get_log tool: AI reads the plugin's in-memory log; test confirms JSON array returned
-  - get_pending tool: exercises genai_is_pending wire path
+  - get_pending tool: exercises agent_is_pending wire path
   - Memory: short-term history persists within a session
   - clear_memory: wipes short-term history, subsequent query starts fresh
   - clear_longterm: discards long-term summary without touching short-term memory
@@ -76,8 +76,8 @@ _TOOLS = [
 
 
 def _get_persistent():
-    import amxmodx_genai.server as srv_mod
-    from amxmodx_genai.server import _handle_persistent
+    import amxx_agent.server as srv_mod
+    from amxx_agent.server import _handle_persistent
 
     if srv_mod._sem is None:
         srv_mod._sem = asyncio.Semaphore(8)
@@ -122,7 +122,9 @@ async def _exchange(
         all_frames.append(frame)
 
         if frame.get("type") == "tool_call" and frame.get("request_id") == request_id:
-            content = tool_responses.get(frame.get("name", ""), '{"error":"unknown tool"}')
+            content = tool_responses.get(
+                frame.get("name", ""), '{"error":"unknown tool"}'
+            )
             writer.write(
                 (
                     json.dumps(
@@ -176,8 +178,10 @@ async def test_set_value_args_forwarded(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             frames = await _exchange(
                 unused_tcp_port,
@@ -218,8 +222,10 @@ async def test_get_value_result_returned_to_agent(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             frames = await _exchange(
                 unused_tcp_port,
@@ -257,8 +263,10 @@ async def test_get_log_returns_json_array(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _exchange(
                 unused_tcp_port,
@@ -274,7 +282,7 @@ async def test_get_log_returns_json_array(unused_tcp_port):
 
 
 # ---------------------------------------------------------------------------
-# get_pending: exercises genai_is_pending via the wire (tool round-trip)
+# get_pending: exercises agent_is_pending via the wire (tool round-trip)
 # ---------------------------------------------------------------------------
 
 
@@ -295,8 +303,10 @@ async def test_get_pending_tool_returns_bool(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _exchange(
                 unused_tcp_port,
@@ -334,8 +344,10 @@ async def test_set_then_get_sequential(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             frames = await _exchange(
                 unused_tcp_port,
@@ -361,7 +373,7 @@ async def test_set_then_get_sequential(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_memory_persists_within_session(unused_tcp_port):
     """A second query in the same session has access to the first exchange."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     call_count = 0
 
@@ -369,11 +381,15 @@ async def test_memory_persists_within_session(unused_tcp_port):
         nonlocal call_count
         call_count += 1
         inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result(f"reply_{call_count}"))
+        inst.invoke_async = AsyncMock(
+            return_value=make_agent_result(f"reply_{call_count}")
+        )
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _exchange(unused_tcp_port, "first message", "r1", {})
             await _exchange(unused_tcp_port, "second message", "r2", {})
@@ -393,22 +409,29 @@ async def test_memory_persists_within_session(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_clear_memory_resets_session(unused_tcp_port):
     """After clear_memory the session history is empty."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     def make_agent(**kwargs):
         inst = MagicMock()
         inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _exchange(unused_tcp_port, "remember this", "r1", {})
             assert len(mem.get(_SESSION)) == 2
 
             await _send_control(
                 unused_tcp_port,
-                {"type": "clear_memory", "request_id": "cm1", "player": 0, "session_id": _SESSION},
+                {
+                    "type": "clear_memory",
+                    "request_id": "cm1",
+                    "player": 0,
+                    "session_id": _SESSION,
+                },
             )
 
     assert mem.get(_SESSION) == []
@@ -422,14 +445,16 @@ async def test_clear_memory_resets_session(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_clear_longterm_removes_summary(unused_tcp_port):
     """clear_longterm deletes the stored long-term summary for a session."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     session = f"{_SESSION}__lt_test"
     mem.set_longterm(session, "prior knowledge: player prefers AK47")
     assert mem.get_longterm(session) != ""
 
-    with patch("amxmodx_genai.core.handler.Agent", return_value=MagicMock()):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", return_value=MagicMock()):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _send_control(
                 unused_tcp_port,
@@ -452,7 +477,7 @@ async def test_clear_longterm_removes_summary(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_player_query_uses_separate_session(unused_tcp_port):
     """Queries with different session_ids accumulate separate histories."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     def make_agent(**kwargs):
         inst = MagicMock()
@@ -461,10 +486,14 @@ async def test_player_query_uses_separate_session(unused_tcp_port):
 
     player_session = f"{_SESSION}_p1"
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
-            await _exchange(unused_tcp_port, "server prompt", "r1", {}, session_id=_SESSION)
+            await _exchange(
+                unused_tcp_port, "server prompt", "r1", {}, session_id=_SESSION
+            )
             await _exchange(
                 unused_tcp_port,
                 "player prompt",
@@ -502,13 +531,15 @@ async def test_skills_forwarded_in_query(unused_tcp_port):
         return None  # no actual skill files needed for this wire test
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
         patch(
-            "amxmodx_genai.core.handler.load_plugin_skills",
+            "amxx_agent.core.handler.load_plugin_skills",
             side_effect=capturing_load_plugin_skills,
         ),
     ):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _exchange(
                 unused_tcp_port,
@@ -530,15 +561,17 @@ async def test_skills_forwarded_in_query(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_sessions_are_isolated(unused_tcp_port):
     """Queries with different session_ids accumulate separate histories."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     def make_agent(**kwargs):
         inst = MagicMock()
         inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _exchange(
                 unused_tcp_port, "session A message", "r1", {}, session_id="testable__a"
@@ -577,8 +610,10 @@ async def test_unknown_tool_error_forwarded(unused_tcp_port):
         inst.invoke_async = AsyncMock(side_effect=fake_invoke)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        srv = await asyncio.start_server(_get_persistent(), "127.0.0.1", unused_tcp_port)
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        srv = await asyncio.start_server(
+            _get_persistent(), "127.0.0.1", unused_tcp_port
+        )
         async with srv:
             await _exchange(
                 unused_tcp_port,

@@ -1,19 +1,19 @@
 // weapon_advisor.sma - Example: per-player weapon advice backed by a skill.
 //
 // Demonstrates:
-//   - genai_register_skill: gives the AI access to a skill directory loaded on
+//   - agent_register_skill: gives the AI access to a skill directory loaded on
 //     the sidecar, without the plugin needing to embed that knowledge itself
 //   - Combining a skill with a custom tool: the AI can look up the player's
 //     current loadout via get_my_weapon before giving advice
 //   - this_plugin=true so weapon conversations stay separate from other plugins
 
 #include <amxmodx>
-#include <amxmodx_genai>
+#include <amxx_agent>
 #include <json>
 
 #define PLUGIN  "AI Weapon Advisor"
 #define VERSION "1.0.0"
-#define AUTHOR  "amxmodx-genai"
+#define AUTHOR  "amxx-agent"
 
 public plugin_init()
 {
@@ -21,15 +21,15 @@ public plugin_init()
 
     register_clcmd("say /weapon", "cmd_weapon");
 
-    genai_set_plugin_context("You are a Counter-Strike 1.6 weapon advisor. Use the cs16-strategy skill to answer questions about weapons and tactics. You can call get_my_weapon to check what the player currently has equipped. Keep answers to two sentences maximum.");
+    agent_set_plugin_context("You are a Counter-Strike 1.6 weapon advisor. Use the cs16-strategy skill to answer questions about weapons and tactics. You can call get_my_weapon to check what the player currently has equipped. Keep answers to two sentences maximum.");
 
     // Register the cs16-strategy skill so the AI loads it when handling requests
     // from this plugin. Deploy skills/weapon_advisor__cs16-strategy/ from this
-    // directory to GENAI_SKILLS_PATH on the sidecar host before starting it.
-    genai_register_skill("cs16-strategy");
+    // directory to AGENT_SKILLS_PATH on the sidecar host before starting it.
+    agent_register_skill("cs16-strategy");
 
     // Custom tool: what weapon is the player holding right now?
-    genai_register_tool(
+    agent_register_tool(
         "get_my_weapon",
         "Returns the name of the weapon the player currently has in their hands.",
         "tool_get_my_weapon"
@@ -38,7 +38,7 @@ public plugin_init()
 
 public cmd_weapon(player)
 {
-    if (genai_is_pending(player)) {
+    if (agent_is_pending(player)) {
         client_print(player, print_chat, "[Advisor] Still thinking...");
         return PLUGIN_HANDLED;
     }
@@ -51,7 +51,7 @@ public cmd_weapon(player)
         return PLUGIN_HANDLED;
     }
 
-    genai_query_player(player, args, "on_advisor_response", true);
+    agent_query_player(player, args, "on_advisor_response", true);
     return PLUGIN_HANDLED;
 }
 
@@ -88,5 +88,5 @@ public tool_get_my_weapon(player, const args_json[], result[], maxlen)
 
 public client_disconnect(player)
 {
-    genai_clear_memory(player);
+    agent_clear_memory(player);
 }

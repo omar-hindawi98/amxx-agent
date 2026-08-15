@@ -13,12 +13,12 @@ import pytest
 @pytest.fixture(autouse=True)
 def fresh_memory(tmp_path):
     db_file = str(tmp_path / "unit_memory.db")
-    os.environ["GENAI_MEMORY_PATH"] = db_file
+    os.environ["AGENT_MEMORY_PATH"] = db_file
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
     yield
-    del os.environ["GENAI_MEMORY_PATH"]
+    del os.environ["AGENT_MEMORY_PATH"]
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]

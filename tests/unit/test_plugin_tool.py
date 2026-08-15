@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from amxmodx_genai.tools.plugin import _build_input_schema, make_plugin_tool
+from amxx_agent.tools.plugin import _build_input_schema, make_plugin_tool
 
 # ---------------------------------------------------------------------------
 # _build_input_schema
@@ -20,8 +20,18 @@ def test_build_schema_empty_params():
 
 def test_build_schema_required_and_optional():
     params = [
-        {"name": "player_id", "type": "integer", "required": True, "description": "Player index"},
-        {"name": "verbose", "type": "boolean", "required": False, "description": "Extra output"},
+        {
+            "name": "player_id",
+            "type": "integer",
+            "required": True,
+            "description": "Player index",
+        },
+        {
+            "name": "verbose",
+            "type": "boolean",
+            "required": False,
+            "description": "Extra output",
+        },
     ]
     schema = _build_input_schema(params)
     assert schema["properties"]["player_id"] == {
@@ -85,7 +95,9 @@ def _make_send_queue_pair():
     async def send(obj: dict) -> None:
         sent.append(obj)
         if obj.get("type") == "tool_call":
-            await queue.put({"type": "tool_result", "id": obj["id"], "content": "test_result"})
+            await queue.put(
+                {"type": "tool_result", "id": obj["id"], "content": "test_result"}
+            )
 
     return send, queue, sent
 
@@ -96,7 +108,9 @@ async def test_no_params_tool_sends_args_string():
     send, queue, sent = _make_send_queue_pair()
     session_data: dict = {}
 
-    t = make_plugin_tool("myplugin__get_map", "Returns map name", send, queue, "req1", session_data)
+    t = make_plugin_tool(
+        "myplugin__get_map", "Returns map name", send, queue, "req1", session_data
+    )
     fn = t.func if hasattr(t, "func") else t
     result = await fn(args='{"format":"short"}')
     assert result == "test_result"
@@ -111,13 +125,24 @@ async def test_no_params_tool_sends_args_string():
 async def test_with_params_tool_serializes_kwargs():
     """With params, the tool receives typed kwargs and serializes them to args JSON."""
     params = [
-        {"name": "player_id", "type": "integer", "required": True, "description": "Player index"},
+        {
+            "name": "player_id",
+            "type": "integer",
+            "required": True,
+            "description": "Player index",
+        },
     ]
     send, queue, sent = _make_send_queue_pair()
     session_data: dict = {}
 
     t = make_plugin_tool(
-        "myplugin__get_player", "Get player", send, queue, "req2", session_data, params=params
+        "myplugin__get_player",
+        "Get player",
+        send,
+        queue,
+        "req2",
+        session_data,
+        params=params,
     )
     fn = t.func if hasattr(t, "func") else t
     result = await fn(player_id=3)

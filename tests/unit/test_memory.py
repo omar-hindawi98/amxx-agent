@@ -11,22 +11,22 @@ import pytest
 def fresh_memory(tmp_path):
     # Clear cached modules so each test gets a fresh import.
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
 
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     mem._engine = mem._make_engine(tmp_path / "test_memory.db")
 
     yield
 
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
 
 
 def _mem():
-    import amxmodx_genai.core.memory as m
+    import amxx_agent.core.memory as m
 
     return m
 
@@ -44,7 +44,10 @@ def test_update_and_get():
         "role": "user",
         "content": [{"type": "text", "text": "what should I buy?"}],
     }
-    assert result[1] == {"role": "assistant", "content": [{"type": "text", "text": "Buy AK47."}]}
+    assert result[1] == {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "Buy AK47."}],
+    }
 
 
 def test_update_accumulates():
@@ -141,20 +144,20 @@ def test_longterm_sessions_isolated():
 def test_persists_across_reimport(tmp_path):
     db_path = tmp_path / "persist_test.db"
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
 
-    import amxmodx_genai.core.memory as mem1
+    import amxx_agent.core.memory as mem1
 
     mem1._engine = mem1._make_engine(db_path)
     mem1.update("42", "hello", "world")
 
     # Simulate restart: clear modules and re-import with the same DB path.
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
 
-    import amxmodx_genai.core.memory as mem2
+    import amxx_agent.core.memory as mem2
 
     mem2._engine = mem2._make_engine(db_path)
 
@@ -194,16 +197,18 @@ async def test_concurrent_updates_different_sessions_isolated():
         for i in range(3):
             await asyncio.to_thread(mem.update, sid, f"p{i}", f"r{i}")
 
-    await asyncio.gather(write_session("alpha"), write_session("beta"), write_session("gamma"))
+    await asyncio.gather(
+        write_session("alpha"), write_session("beta"), write_session("gamma")
+    )
 
     assert len(mem.get("alpha")) == 6
     assert len(mem.get("beta")) == 6
     assert len(mem.get("gamma")) == 6
     # Verify no cross-contamination
     for row in mem.get("alpha"):
-        assert row["content"][0]["text"].startswith("p") or row["content"][0]["text"].startswith(
-            "r"
-        )
+        assert row["content"][0]["text"].startswith("p") or row["content"][0][
+            "text"
+        ].startswith("r")
 
 
 @pytest.mark.asyncio

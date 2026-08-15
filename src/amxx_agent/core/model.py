@@ -1,6 +1,6 @@
-"""Model factory - returns the right Strands model based on GENAI_MODEL_BACKEND."""
+"""Model factory - returns the right Strands model based on AGENT_MODEL_BACKEND."""
 
-from amxmodx_genai.config import settings
+from amxx_agent.config import settings
 
 _SUPPORTED = ("anthropic", "bedrock", "ollama", "litellm", "openai")
 _OLLAMA_DEFAULT_ENDPOINT = "http://localhost:11434"
@@ -14,7 +14,9 @@ def validate() -> None:
     """Raise at startup if required credentials for the configured backend are missing."""
     backend = settings.model_backend
     if backend in _NEEDS_API_KEY and not settings.model_api_key:
-        raise RuntimeError(f"GENAI_MODEL_API_KEY is required when GENAI_MODEL_BACKEND={backend}")
+        raise RuntimeError(
+            f"AGENT_MODEL_API_KEY is required when AGENT_MODEL_BACKEND={backend}"
+        )
 
 
 def get_model():
@@ -29,23 +31,25 @@ def get_summary_model():
     """Return a cached model for summarization with a higher token ceiling.
 
     Summarization prompts can be large (full conversation history), so the
-    output budget must be at least 1024 tokens regardless of GENAI_MODEL_TOKENS.
+    output budget must be at least 1024 tokens regardless of AGENT_MODEL_TOKENS.
     """
     global _cached_summary_model
     if _cached_summary_model is None:
-        _cached_summary_model = _build_model(max_tokens=max(settings.model_tokens, 1024))
+        _cached_summary_model = _build_model(
+            max_tokens=max(settings.model_tokens, 1024)
+        )
     return _cached_summary_model
 
 
 def _build_model(max_tokens: int | None = None):
     """Construct a new Strands model for the configured backend.
 
-    Supported backends (GENAI_MODEL_BACKEND):
-      anthropic - Anthropic API (default); requires GENAI_MODEL_API_KEY
+    Supported backends (AGENT_MODEL_BACKEND):
+      anthropic - Anthropic API (default); requires AGENT_MODEL_API_KEY
       bedrock   - AWS Bedrock; credentials via standard AWS env vars
-      ollama    - local Ollama server; set GENAI_MODEL_ENDPOINT for a non-default host
+      ollama    - local Ollama server; set AGENT_MODEL_ENDPOINT for a non-default host
       litellm   - LiteLLM proxy; covers OpenRouter, Groq, Cohere, etc.
-      openai    - OpenAI-compatible API; set GENAI_MODEL_ENDPOINT for a custom base URL
+      openai    - OpenAI-compatible API; set AGENT_MODEL_ENDPOINT for a custom base URL
     """
     backend = settings.model_backend
     model_id = settings.model_name
@@ -75,7 +79,9 @@ def _build_model(max_tokens: int | None = None):
         if endpoint:
             client_args["base_url"] = endpoint
         return LiteLLMModel(
-            model_id=model_id, params={"max_tokens": max_tokens}, client_args=client_args
+            model_id=model_id,
+            params={"max_tokens": max_tokens},
+            client_args=client_args,
         )
 
     if backend == "openai":
@@ -85,7 +91,9 @@ def _build_model(max_tokens: int | None = None):
         if endpoint:
             client_args["base_url"] = endpoint
         return OpenAIModel(
-            model_id=model_id, params={"max_tokens": max_tokens}, client_args=client_args
+            model_id=model_id,
+            params={"max_tokens": max_tokens},
+            client_args=client_args,
         )
 
     if backend != "anthropic":
@@ -100,4 +108,6 @@ def _build_model(max_tokens: int | None = None):
     from strands.models.anthropic import AnthropicModel
 
     client_args = {"api_key": api_key} if api_key else {}
-    return AnthropicModel(model_id=model_id, max_tokens=max_tokens, client_args=client_args)
+    return AnthropicModel(
+        model_id=model_id, max_tokens=max_tokens, client_args=client_args
+    )

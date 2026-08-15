@@ -10,7 +10,7 @@ labels: enhancement
 
 ## Proposed solution
 
-<!-- How should it work? Any API changes to genai.inc? -->
+<!-- How should it work? Any API changes to agent.inc? -->
 
 ## Alternatives considered
 

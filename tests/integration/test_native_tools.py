@@ -12,9 +12,9 @@ from tests.integration.helpers import get_handle, make_agent_result, tcp_exchang
 @pytest.mark.asyncio
 async def test_native_tools_passed_to_agent(unused_tcp_port, monkeypatch):
     """native_tools list is included in Agent kwargs for non-ollama backends."""
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "anthropic")
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "anthropic")
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
 
     captured_kwargs: dict = {}
@@ -26,15 +26,20 @@ async def test_native_tools_passed_to_agent(unused_tcp_port, monkeypatch):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.core.handler.get_model", return_value=MagicMock()),
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.core.handler.get_model", return_value=MagicMock()),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await tcp_exchange(
                 "127.0.0.1",
                 unused_tcp_port,
-                {"type": "query", "player": 1, "prompt": "what time is it?", "tools": []},
+                {
+                    "type": "query",
+                    "player": 1,
+                    "prompt": "what time is it?",
+                    "tools": [],
+                },
             )
 
     tool_names = [t.__name__ for t in captured_kwargs.get("tools", [])]
@@ -42,11 +47,13 @@ async def test_native_tools_passed_to_agent(unused_tcp_port, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port, monkeypatch):
+async def test_current_datetime_tool_callable_returns_iso_string(
+    unused_tcp_port, monkeypatch
+):
     """current_datetime tool can be called and returns an ISO 8601 string."""
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "anthropic")
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "anthropic")
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
 
     call_result: list[str] = []
@@ -66,15 +73,20 @@ async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.core.handler.get_model", return_value=MagicMock()),
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.core.handler.get_model", return_value=MagicMock()),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await tcp_exchange(
                 "127.0.0.1",
                 unused_tcp_port,
-                {"type": "query", "player": 1, "prompt": "what time is it?", "tools": []},
+                {
+                    "type": "query",
+                    "player": 1,
+                    "prompt": "what time is it?",
+                    "tools": [],
+                },
             )
 
     assert len(call_result) == 1
@@ -84,9 +96,9 @@ async def test_current_datetime_tool_callable_returns_iso_string(unused_tcp_port
 @pytest.mark.asyncio
 async def test_native_tools_omitted_for_ollama(unused_tcp_port, monkeypatch):
     """Native tools are excluded from Agent kwargs when backend is ollama."""
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "ollama")
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "ollama")
     for mod in list(sys.modules):
-        if mod.startswith("amxmodx_genai"):
+        if mod.startswith("amxx_agent"):
             del sys.modules[mod]
 
     captured_kwargs: dict = {}
@@ -97,7 +109,7 @@ async def test_native_tools_omitted_for_ollama(unused_tcp_port, monkeypatch):
         inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=capture_agent):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await tcp_exchange(

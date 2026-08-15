@@ -28,26 +28,26 @@ public plugin_init()
 {
     register_plugin(PLUGIN, VERSION, AUTHOR);
 
-    g_pCvarHost       = register_cvar("genai_host",        "127.0.0.1");
-    g_pCvarPort       = register_cvar("genai_port",        "27016");
-    g_pCvarCoreTools  = register_cvar("genai_core_tools",  "1");
-    g_pCvarCoreSkills = register_cvar("genai_core_skills", "1");
+    g_pCvarHost       = register_cvar("agent_host",        "127.0.0.1");
+    g_pCvarPort       = register_cvar("agent_port",        "27016");
+    g_pCvarCoreTools  = register_cvar("agent_core_tools",  "1");
+    g_pCvarCoreSkills = register_cvar("agent_core_skills", "1");
 
     g_tSystemPrompts = TrieCreate();
 
-    register_library("amxmodx_genai");
+    register_library("amxx_agent");
 
-    register_native("genai_query_player",          "native_query_player");
-    register_native("genai_query",                 "native_query");
-    register_native("genai_cancel",                "native_cancel");
-    register_native("genai_is_pending",            "native_is_pending");
-    register_native("genai_set_plugin_context",    "native_set_plugin_context");
-    register_native("genai_append_plugin_context", "native_append_plugin_context");
-    register_native("genai_clear_memory",           "native_clear_memory");
-    register_native("genai_register_tool",         "native_register_tool");
-    register_native("genai_add_tool_param",        "native_add_tool_param");
-    register_native("genai_register_skill",        "native_register_skill");
-    register_native("genai_clear_longterm_memory", "native_clear_longterm_memory");
+    register_native("agent_query_player",          "native_query_player");
+    register_native("agent_query",                 "native_query");
+    register_native("agent_cancel",                "native_cancel");
+    register_native("agent_is_pending",            "native_is_pending");
+    register_native("agent_set_plugin_context",    "native_set_plugin_context");
+    register_native("agent_append_plugin_context", "native_append_plugin_context");
+    register_native("agent_clear_memory",           "native_clear_memory");
+    register_native("agent_register_tool",         "native_register_tool");
+    register_native("agent_add_tool_param",        "native_add_tool_param");
+    register_native("agent_register_skill",        "native_register_skill");
+    register_native("agent_clear_longterm_memory", "native_clear_longterm_memory");
 
     if (get_pcvar_num(g_pCvarCoreTools))
         register_core_tools();
@@ -232,7 +232,7 @@ public task_poll_sockets()
 }
 
 // ---- send_query_frame -------------------------------------------------------
-// Shared implementation for all genai_query_* variants. Builds and sends the
+// Shared implementation for all agent_query_* variants. Builds and sends the
 // JSON query frame, allocates a queue slot, and starts the poll task.
 // Returns the slot index on success, -1 on error.
 
@@ -337,7 +337,7 @@ static get_steamid_or_server(player, session_id[], maxlen)
 
 // ---- natives ----------------------------------------------------------------
 
-// genai_query_player: per-player memory.
+// agent_query_player: per-player memory.
 // this_plugin=true isolates memory to this plugin; false shares it across all plugins.
 public native_query_player(plugin_id, num_params)
 {
@@ -369,7 +369,7 @@ public native_query_player(plugin_id, num_params)
     return send_query_frame(plugin_id, player, prompt, callback, session_id, bool:no_memory);
 }
 
-// genai_query: explicit session key for custom scopes (team, server, etc.)
+// agent_query: explicit session key for custom scopes (team, server, etc.)
 // No player param - callback signature is (const response[]) not (player, response[]).
 public native_query(plugin_id, num_params)
 {
@@ -525,7 +525,7 @@ public native_register_tool(plugin_id, num_params)
 public native_add_tool_param(plugin_id, num_params)
 {
     if (g_iCurrentTool < 0) {
-        log_amx("[GenAI] genai_add_tool_param called before genai_register_tool");
+        log_amx("[GenAI] agent_add_tool_param called before agent_register_tool");
         return;
     }
 

@@ -1,22 +1,22 @@
 // admin_assistant.sma - Example: admin-only AI assistant.
 //
 // Demonstrates every major plugin API function:
-//   - genai_set_plugin_context + genai_append_plugin_context
-//   - genai_register_tool + genai_add_tool_param  (get_server_stats, set_motd)
-//   - genai_register_skill                         (admin-procedures skill)
-//   - genai_query_player                           (per-admin memory, this_plugin=true)
-//   - genai_is_pending                             (guard duplicate requests)
-//   - genai_cancel                                 (/ai_cancel command)
-//   - genai_clear_memory                           (/ai_reset command)
-//   - genai_clear_longterm_memory                  (amx_ai_fullreset console command)
+//   - agent_set_plugin_context + agent_append_plugin_context
+//   - agent_register_tool + agent_add_tool_param  (get_server_stats, set_motd)
+//   - agent_register_skill                         (admin-procedures skill)
+//   - agent_query_player                           (per-admin memory, this_plugin=true)
+//   - agent_is_pending                             (guard duplicate requests)
+//   - agent_cancel                                 (/ai_cancel command)
+//   - agent_clear_memory                           (/ai_reset command)
+//   - agent_clear_longterm_memory                  (amx_ai_fullreset console command)
 
 #include <amxmodx>
-#include <amxmodx_genai>
+#include <amxx_agent>
 #include <json>
 
 #define PLUGIN  "AI Admin Assistant"
 #define VERSION "1.0.0"
-#define AUTHOR  "amxmodx-genai"
+#define AUTHOR  "amxx-agent"
 
 #define REQUIRED_ACCESS ADMIN_KICK
 
@@ -34,7 +34,7 @@ public plugin_init()
                     "Wipe long-term AI memory for an admin (amx_ai_fullreset <#id>)");
 
     // Base system prompt for this plugin.
-    genai_set_plugin_context("You are an AI assistant for server administrators on a Counter-Strike 1.6 server. Use the available tools to check server state and take moderation actions. Always confirm before kicking or banning a player.");
+    agent_set_plugin_context("You are an AI assistant for server administrators on a Counter-Strike 1.6 server. Use the available tools to check server state and take moderation actions. Always confirm before kicking or banning a player.");
 
     // Append live context that applies to every conversation.
     new map[36];
@@ -43,15 +43,15 @@ public plugin_init()
     format(ctx, sizeof(ctx) - 1,
         "Current map: %s. Max players: %d. You have tools: get_server_stats and set_motd.",
         map, get_maxplayers());
-    genai_append_plugin_context(ctx);
+    agent_append_plugin_context(ctx);
 
     // Register the admin-procedures skill.
     // Deploy examples/admin_assistant/skills/admin_assistant__admin-procedures/
-    // to GENAI_SKILLS_PATH on the sidecar host before starting it.
-    genai_register_skill("admin-procedures");
+    // to AGENT_SKILLS_PATH on the sidecar host before starting it.
+    agent_register_skill("admin-procedures");
 
     // Tool: return a JSON snapshot of current server state.
-    genai_register_tool(
+    agent_register_tool(
         "get_server_stats",
         "Returns current player count, map name, and server uptime in seconds.",
         "tool_get_server_stats"
@@ -59,12 +59,12 @@ public plugin_init()
     // No parameters - the tool takes none.
 
     // Tool: update the server MOTD text.
-    genai_register_tool(
+    agent_register_tool(
         "set_motd",
         "Replaces the server message-of-the-day with the provided text.",
         "tool_set_motd"
     );
-    genai_add_tool_param("text", "string", true, "New MOTD text (plain text, max 480 chars)");
+    agent_add_tool_param("text", "string", true, "New MOTD text (plain text, max 480 chars)");
 }
 
 public cmd_ai(player)
@@ -74,7 +74,7 @@ public cmd_ai(player)
         return PLUGIN_HANDLED;
     }
 
-    if (genai_is_pending(player)) {
+    if (agent_is_pending(player)) {
         client_print(player, print_chat, "[AI] Still working on your last request...");
         return PLUGIN_HANDLED;
     }
@@ -87,7 +87,7 @@ public cmd_ai(player)
         return PLUGIN_HANDLED;
     }
 
-    genai_query_player(player, args, "on_ai_response", true);
+    agent_query_player(player, args, "on_ai_response", true);
     client_print(player, print_chat, "[AI] Thinking...");
     return PLUGIN_HANDLED;
 }
@@ -100,7 +100,7 @@ public cmd_ai_cancel(player)
         return PLUGIN_HANDLED;
     }
 
-    genai_cancel(player);
+    agent_cancel(player);
     client_print(player, print_chat, "[AI] Request cancelled.");
     return PLUGIN_HANDLED;
 }
@@ -113,7 +113,7 @@ public cmd_ai_reset(player)
         return PLUGIN_HANDLED;
     }
 
-    genai_clear_memory(player);
+    agent_clear_memory(player);
     client_print(player, print_chat, "[AI] Conversation cleared.");
     return PLUGIN_HANDLED;
 }
@@ -142,10 +142,10 @@ public cmd_ai_fullreset(player, level, cid)
         return PLUGIN_HANDLED;
     }
 
-    // genai_clear_memory triggers summarization then deletes short-term turns.
-    // genai_clear_longterm_memory then discards the resulting summary.
-    genai_clear_memory(target);
-    genai_clear_longterm_memory(target);
+    // agent_clear_memory triggers summarization then deletes short-term turns.
+    // agent_clear_longterm_memory then discards the resulting summary.
+    agent_clear_memory(target);
+    agent_clear_longterm_memory(target);
 
     new name[32];
     get_user_name(target, name, sizeof(name) - 1);
@@ -230,7 +230,7 @@ public tool_set_motd(player, const args_json[], result[], maxlen)
 public client_disconnect(player)
 {
     if (get_user_flags(player) & REQUIRED_ACCESS) {
-        genai_cancel(player);
-        genai_clear_memory(player);
+        agent_cancel(player);
+        agent_clear_memory(player);
     }
 }

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from amxmodx_genai.core.protocol import read_json, send_json
+from amxx_agent.core.protocol import read_json, send_json
 
 # ---------------------------------------------------------------------------
 # send_json

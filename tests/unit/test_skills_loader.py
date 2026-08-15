@@ -19,12 +19,12 @@ def _make_skill_dir(tmp_path: Path, name: str, *, with_skill_md: bool = True) ->
 
 def test_load_plugin_skills_valid(tmp_path):
     _make_skill_dir(tmp_path, "greet")
-    import amxmodx_genai.skills.loader as loader
+    import amxx_agent.skills.loader as loader
 
     mock_agent_skills = MagicMock()
-    with patch("amxmodx_genai.skills.loader.settings") as mock_settings:
+    with patch("amxx_agent.skills.loader.settings") as mock_settings:
         mock_settings.skills_path = tmp_path
-        with patch("amxmodx_genai.skills.loader.AgentSkills", mock_agent_skills):
+        with patch("amxx_agent.skills.loader.AgentSkills", mock_agent_skills):
             loader.load_plugin_skills(["greet"])
 
     mock_agent_skills.assert_called_once()
@@ -36,13 +36,13 @@ def test_load_plugin_skills_missing_skill_is_skipped(tmp_path, caplog):
     _make_skill_dir(tmp_path, "real")
     import logging
 
-    import amxmodx_genai.skills.loader as loader
+    import amxx_agent.skills.loader as loader
 
     mock_agent_skills = MagicMock()
-    with patch("amxmodx_genai.skills.loader.settings") as mock_settings:
+    with patch("amxx_agent.skills.loader.settings") as mock_settings:
         mock_settings.skills_path = tmp_path
         with (
-            patch("amxmodx_genai.skills.loader.AgentSkills", mock_agent_skills),
+            patch("amxx_agent.skills.loader.AgentSkills", mock_agent_skills),
             caplog.at_level(logging.WARNING),
         ):
             loader.load_plugin_skills(["real", "ghost"])
@@ -55,22 +55,22 @@ def test_load_plugin_skills_missing_skill_is_skipped(tmp_path, caplog):
 
 
 def test_load_plugin_skills_all_missing_returns_none(tmp_path):
-    import amxmodx_genai.skills.loader as loader
+    import amxx_agent.skills.loader as loader
 
-    with patch("amxmodx_genai.skills.loader.settings") as mock_settings:
+    with patch("amxx_agent.skills.loader.settings") as mock_settings:
         mock_settings.skills_path = tmp_path
-        with patch("amxmodx_genai.skills.loader.AgentSkills", MagicMock()):
+        with patch("amxx_agent.skills.loader.AgentSkills", MagicMock()):
             result = loader.load_plugin_skills(["nonexistent"])
 
     assert result is None
 
 
 def test_load_plugin_skills_empty_list_returns_none(tmp_path):
-    import amxmodx_genai.skills.loader as loader
+    import amxx_agent.skills.loader as loader
 
-    with patch("amxmodx_genai.skills.loader.settings") as mock_settings:
+    with patch("amxx_agent.skills.loader.settings") as mock_settings:
         mock_settings.skills_path = tmp_path
-        with patch("amxmodx_genai.skills.loader.AgentSkills", MagicMock()):
+        with patch("amxx_agent.skills.loader.AgentSkills", MagicMock()):
             result = loader.load_plugin_skills([])
 
     assert result is None
@@ -87,11 +87,11 @@ def test_load_builtin_skills_finds_skill_md_dirs(tmp_path):
     _make_skill_dir(tmp_path, "no_skill_md", with_skill_md=False)
 
     mock_agent_skills = MagicMock()
-    import amxmodx_genai.skills.loader as loader
+    import amxx_agent.skills.loader as loader
 
     with (
         patch.object(loader, "_BUILTIN_SKILLS_DIR", tmp_path),
-        patch("amxmodx_genai.skills.loader.AgentSkills", mock_agent_skills),
+        patch("amxx_agent.skills.loader.AgentSkills", mock_agent_skills),
     ):
         loader.load_builtin_skills()
 
@@ -103,7 +103,7 @@ def test_load_builtin_skills_finds_skill_md_dirs(tmp_path):
 
 
 def test_load_builtin_skills_no_dirs_returns_none(tmp_path):
-    import amxmodx_genai.skills.loader as loader
+    import amxx_agent.skills.loader as loader
 
     with patch.object(loader, "_BUILTIN_SKILLS_DIR", tmp_path):
         result = loader.load_builtin_skills()

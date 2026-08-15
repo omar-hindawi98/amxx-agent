@@ -10,4 +10,4 @@ RUN uv sync --dev
 COPY src/ src/
 COPY tests/ tests/
 
-CMD ["uv", "run", "genai-sidecar"]
+CMD ["uv", "run", "agent-sidecar"]

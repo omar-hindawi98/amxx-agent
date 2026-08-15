@@ -10,7 +10,7 @@ from tests.integration.helpers import make_agent_result
 
 
 def _get_handler():
-    import amxmodx_genai.core.handler as h
+    import amxx_agent.core.handler as h
 
     return h
 
@@ -103,7 +103,9 @@ def test_build_system_prompt_longterm_after_cache_point():
     h = _get_handler()
     result = h._build_system_prompt("", "", "some memory")
     cache_idx = next(i for i, b in enumerate(result) if "cachePoint" in b)
-    longterm_idx = next(i for i, b in enumerate(result) if "Memory" in b.get("text", ""))
+    longterm_idx = next(
+        i for i, b in enumerate(result) if "Memory" in b.get("text", "")
+    )
     assert longterm_idx > cache_idx
 
 
@@ -176,7 +178,7 @@ async def test_empty_content_list_returns_no_response(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=result)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await tcp_exchange(
@@ -206,7 +208,7 @@ async def test_whitespace_only_text_returns_no_response(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=result)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await tcp_exchange(
@@ -232,7 +234,7 @@ async def test_none_message_returns_no_response(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=result)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await tcp_exchange(
@@ -258,7 +260,7 @@ async def test_dict_content_block_text_extracted(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=result)
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await tcp_exchange(
@@ -281,7 +283,7 @@ async def test_dict_content_block_text_extracted(unused_tcp_port):
 async def test_clear_memory_still_clears_when_summarization_fails(unused_tcp_port):
     """If summarize_session raises, short-term memory is still cleared."""
 
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     mem.update("99", "hello", "world")
     assert mem.get("99") != []
@@ -289,8 +291,10 @@ async def test_clear_memory_still_clears_when_summarization_fails(unused_tcp_por
     async def failing_summarize(*args, **kwargs):
         raise RuntimeError("LLM is down")
 
-    with patch("amxmodx_genai.core.handler.summarize_session", side_effect=failing_summarize):
-        from amxmodx_genai.server import handle_once
+    with patch(
+        "amxx_agent.core.handler.summarize_session", side_effect=failing_summarize
+    ):
+        from amxx_agent.server import handle_once
 
         srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -299,7 +303,10 @@ async def test_clear_memory_still_clears_when_summarization_fails(unused_tcp_por
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
                 (
-                    json.dumps({"type": "clear_memory", "player": 99, "session_id": "99"}) + "\n"
+                    json.dumps(
+                        {"type": "clear_memory", "player": 99, "session_id": "99"}
+                    )
+                    + "\n"
                 ).encode()
             )
             await writer.drain()
@@ -311,9 +318,11 @@ async def test_clear_memory_still_clears_when_summarization_fails(unused_tcp_por
 
 
 @pytest.mark.asyncio
-async def test_clear_memory_longterm_not_updated_when_summarization_fails(unused_tcp_port):
+async def test_clear_memory_longterm_not_updated_when_summarization_fails(
+    unused_tcp_port,
+):
     """If summarize_session raises, long-term memory is not updated."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     mem.update("100", "hello", "world")
     mem.set_longterm("100", "existing summary")
@@ -321,8 +330,10 @@ async def test_clear_memory_longterm_not_updated_when_summarization_fails(unused
     async def failing_summarize(*args, **kwargs):
         raise RuntimeError("LLM is down")
 
-    with patch("amxmodx_genai.core.handler.summarize_session", side_effect=failing_summarize):
-        from amxmodx_genai.server import handle_once
+    with patch(
+        "amxx_agent.core.handler.summarize_session", side_effect=failing_summarize
+    ):
+        from amxx_agent.server import handle_once
 
         srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -331,7 +342,10 @@ async def test_clear_memory_longterm_not_updated_when_summarization_fails(unused
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
                 (
-                    json.dumps({"type": "clear_memory", "player": 100, "session_id": "100"}) + "\n"
+                    json.dumps(
+                        {"type": "clear_memory", "player": 100, "session_id": "100"}
+                    )
+                    + "\n"
                 ).encode()
             )
             await writer.drain()
@@ -347,19 +361,20 @@ async def test_clear_memory_longterm_not_updated_when_summarization_fails(unused
 @pytest.mark.asyncio
 async def test_clear_longterm_removes_longterm_memory(unused_tcp_port):
     """clear_longterm message deletes the long-term summary without touching short-term memory."""
-    import amxmodx_genai.core.memory as mem
+    import amxx_agent.core.memory as mem
 
     mem.update("lt1", "hello", "world")
     mem.set_longterm("lt1", "summary to be deleted")
 
-    from amxmodx_genai.server import handle_once
+    from amxx_agent.server import handle_once
 
     srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
         writer.write(
             (
-                json.dumps({"type": "clear_longterm", "player": 1, "session_id": "lt1"}) + "\n"
+                json.dumps({"type": "clear_longterm", "player": 1, "session_id": "lt1"})
+                + "\n"
             ).encode()
         )
         await writer.drain()
@@ -380,7 +395,7 @@ async def test_clear_longterm_removes_longterm_memory(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_safe_send_error_suppresses_send_exception():
     """_safe_send_error suppresses exceptions raised by the send callable."""
-    import amxmodx_genai.core.handler as h
+    import amxx_agent.core.handler as h
 
     async def broken_send(obj: dict) -> None:
         raise OSError("socket closed")
@@ -392,7 +407,7 @@ async def test_safe_send_error_suppresses_send_exception():
 @pytest.mark.asyncio
 async def test_safe_send_error_suppresses_on_second_call():
     """_safe_send_error suppresses even if the second send (done) raises."""
-    import amxmodx_genai.core.handler as h
+    import amxx_agent.core.handler as h
 
     call_count = 0
 
@@ -418,8 +433,8 @@ async def test_handler_exception_uses_safe_send_error(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()),
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.asyncio.sleep", new=AsyncMock()),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -448,10 +463,12 @@ async def test_response_frame_arrives_before_done_frame(unused_tcp_port):
 
     def make_agent(**kwargs):
         inst = MagicMock()
-        inst.invoke_async = AsyncMock(return_value=make_agent_result("ordered response"))
+        inst.invoke_async = AsyncMock(
+            return_value=make_agent_result("ordered response")
+        )
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             frames = await tcp_exchange(
@@ -463,9 +480,9 @@ async def test_response_frame_arrives_before_done_frame(unused_tcp_port):
     types = [f["type"] for f in frames]
     assert "response" in types
     assert "done" in types
-    assert types.index("response") < types.index("done"), (
-        f"expected response before done, got ordering: {types}"
-    )
+    assert types.index("response") < types.index(
+        "done"
+    ), f"expected response before done, got ordering: {types}"
 
 
 @pytest.mark.asyncio
@@ -479,8 +496,8 @@ async def test_error_response_frame_arrives_before_done_frame(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()),
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.asyncio.sleep", new=AsyncMock()),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
@@ -491,9 +508,9 @@ async def test_error_response_frame_arrives_before_done_frame(unused_tcp_port):
             )
 
     types = [f["type"] for f in frames]
-    assert types.index("response") < types.index("done"), (
-        f"expected response before done on error path, got: {types}"
-    )
+    assert types.index("response") < types.index(
+        "done"
+    ), f"expected response before done on error path, got: {types}"
 
 
 # ---------------------------------------------------------------------------
@@ -504,7 +521,7 @@ async def test_error_response_frame_arrives_before_done_frame(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_semaphore_queues_requests_when_saturated(unused_tcp_port):
     """When max_concurrent=1, a second request queues and completes after the first."""
-    import amxmodx_genai.server as srv_mod
+    import amxx_agent.server as srv_mod
 
     # Set semaphore to 1 so only one handler runs at a time
     original_sem = srv_mod._sem
@@ -531,20 +548,26 @@ async def test_semaphore_queues_requests_when_saturated(unused_tcp_port):
         call_count += 1
         n = call_count
         inst = MagicMock()
-        inst.invoke_async = AsyncMock(side_effect=slow_invoke if n == 1 else fast_invoke)
+        inst.invoke_async = AsyncMock(
+            side_effect=slow_invoke if n == 1 else fast_invoke
+        )
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
-        from amxmodx_genai.server import handle_once
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
+        from amxx_agent.server import handle_once
 
         srv = await asyncio.start_server(handle_once, "127.0.0.1", unused_tcp_port)
         async with srv:
             # Send first request and wait until its agent is running
-            t1 = asyncio.create_task(_send_single("127.0.0.1", unused_tcp_port, "first"))
+            t1 = asyncio.create_task(
+                _send_single("127.0.0.1", unused_tcp_port, "first")
+            )
             await first_started.wait()
 
             # Send second request - it must queue behind the semaphore
-            t2 = asyncio.create_task(_send_single("127.0.0.1", unused_tcp_port, "second"))
+            t2 = asyncio.create_task(
+                _send_single("127.0.0.1", unused_tcp_port, "second")
+            )
             # Small yield to let t2 reach the semaphore
             await asyncio.sleep(0.05)
 
@@ -572,7 +595,7 @@ async def test_auth_token_rejected_when_missing(unused_tcp_port):
     """When auth_token is configured, a request without it gets (unauthorized)."""
     import os
 
-    os.environ["GENAI_AUTH_TOKEN"] = "secret123"
+    os.environ["AGENT_AUTH_TOKEN"] = "secret123"
     try:
         from tests.integration.helpers import get_handle, tcp_exchange
 
@@ -584,7 +607,7 @@ async def test_auth_token_rejected_when_missing(unused_tcp_port):
                 {"type": "query", "player": 1, "prompt": "hello", "tools": []},
             )
     finally:
-        del os.environ["GENAI_AUTH_TOKEN"]
+        del os.environ["AGENT_AUTH_TOKEN"]
 
     response = next(f for f in frames if f["type"] == "response")
     assert "unauthorized" in response["text"].lower()
@@ -596,7 +619,7 @@ async def test_auth_token_accepted_when_correct(unused_tcp_port):
     """When auth_token is configured and provided correctly, the request proceeds."""
     import os
 
-    os.environ["GENAI_AUTH_TOKEN"] = "secret123"
+    os.environ["AGENT_AUTH_TOKEN"] = "secret123"
     try:
 
         def make_agent(**kwargs):
@@ -604,7 +627,7 @@ async def test_auth_token_accepted_when_correct(unused_tcp_port):
             inst.invoke_async = AsyncMock(return_value=make_agent_result("ok"))
             return inst
 
-        with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+        with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
             from tests.integration.helpers import get_handle, tcp_exchange
 
             srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -621,7 +644,7 @@ async def test_auth_token_accepted_when_correct(unused_tcp_port):
                     },
                 )
     finally:
-        del os.environ["GENAI_AUTH_TOKEN"]
+        del os.environ["AGENT_AUTH_TOKEN"]
 
     response = next(f for f in frames if f["type"] == "response")
     assert response["text"] == "ok"
@@ -636,7 +659,7 @@ async def test_auth_disabled_when_token_empty(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=make_agent_result("allowed"))
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
         from tests.integration.helpers import get_handle, tcp_exchange
 
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -659,7 +682,7 @@ async def test_auth_disabled_when_token_empty(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_unknown_message_type_gets_error_response(unused_tcp_port):
     """An unknown message type receives a response+done frame so the client doesn't hang."""
-    from amxmodx_genai.server import _handle_persistent
+    from amxx_agent.server import _handle_persistent
     from tests.integration.helpers import tcp_exchange
 
     srv = await asyncio.start_server(_handle_persistent, "127.0.0.1", unused_tcp_port)
@@ -675,7 +698,7 @@ async def test_unknown_message_type_gets_error_response(unused_tcp_port):
 
 
 # ---------------------------------------------------------------------------
-# Request timeout: wait_for enforces GENAI_REQUEST_TIMEOUT_SECONDS
+# Request timeout: wait_for enforces AGENT_REQUEST_TIMEOUT_SECONDS
 # ---------------------------------------------------------------------------
 
 
@@ -684,9 +707,9 @@ async def test_request_timeout_returns_error(unused_tcp_port):
     """When the agent hangs past request_timeout_seconds, the client gets a timeout error."""
     import os
 
-    os.environ["GENAI_REQUEST_TIMEOUT_SECONDS"] = "0"  # disabled = no timeout
+    os.environ["AGENT_REQUEST_TIMEOUT_SECONDS"] = "0"  # disabled = no timeout
     # Use a very short timeout instead via monkeypatching wait_for
-    os.environ["GENAI_REQUEST_TIMEOUT_SECONDS"] = "1"
+    os.environ["AGENT_REQUEST_TIMEOUT_SECONDS"] = "1"
     try:
         hang_started = asyncio.Event()
 
@@ -699,7 +722,7 @@ async def test_request_timeout_returns_error(unused_tcp_port):
             inst.invoke_async = AsyncMock(side_effect=hanging_invoke)
             return inst
 
-        with patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent):
+        with patch("amxx_agent.core.handler.Agent", side_effect=make_agent):
             from tests.integration.helpers import get_handle, tcp_exchange
 
             srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -713,7 +736,7 @@ async def test_request_timeout_returns_error(unused_tcp_port):
                     timeout=5.0,
                 )
     finally:
-        del os.environ["GENAI_REQUEST_TIMEOUT_SECONDS"]
+        del os.environ["AGENT_REQUEST_TIMEOUT_SECONDS"]
 
     response = next(f for f in frames if f["type"] == "response")
     assert "timed out" in response["text"].lower()
@@ -736,8 +759,8 @@ async def test_no_memory_query_skips_memory_read(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.memory") as mock_mem,
     ):
         mock_mem.get.return_value = []
         mock_mem.get_longterm.return_value = ""
@@ -746,7 +769,13 @@ async def test_no_memory_query_skips_memory_read(unused_tcp_port):
             frames = await tcp_exchange(
                 "127.0.0.1",
                 unused_tcp_port,
-                {"type": "query", "player": 1, "prompt": "lookup", "tools": [], "no_memory": True},
+                {
+                    "type": "query",
+                    "player": 1,
+                    "prompt": "lookup",
+                    "tools": [],
+                    "no_memory": True,
+                },
             )
 
     mock_mem.get.assert_not_called()
@@ -765,8 +794,8 @@ async def test_no_memory_query_skips_memory_write(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.memory") as mock_mem,
     ):
         mock_mem.get.return_value = []
         mock_mem.get_longterm.return_value = ""
@@ -775,7 +804,13 @@ async def test_no_memory_query_skips_memory_write(unused_tcp_port):
             await tcp_exchange(
                 "127.0.0.1",
                 unused_tcp_port,
-                {"type": "query", "player": 1, "prompt": "lookup", "tools": [], "no_memory": True},
+                {
+                    "type": "query",
+                    "player": 1,
+                    "prompt": "lookup",
+                    "tools": [],
+                    "no_memory": True,
+                },
             )
 
     mock_mem.update.assert_not_called()
@@ -792,8 +827,8 @@ async def test_normal_query_does_write_memory(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.memory") as mock_mem,
     ):
         mock_mem.get.return_value = []
         mock_mem.get_longterm.return_value = ""
@@ -824,8 +859,8 @@ async def test_empty_session_id_defaults_to_server(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.handler.memory") as mock_mem,
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.memory") as mock_mem,
     ):
         mock_mem.get.return_value = []
         mock_mem.get_longterm.return_value = ""
@@ -854,12 +889,12 @@ async def test_retry_hook_sets_retry_on_transient_error():
     """_RetryHook sets event.retry=True for a transient exception."""
     from unittest.mock import MagicMock
 
-    from amxmodx_genai.core.handler import _RetryHook
+    from amxx_agent.core.handler import _RetryHook
 
     hook = _RetryHook()
     event = MagicMock()
     event.exception = RuntimeError("transient")
-    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+    with patch("amxx_agent.core.handler.asyncio.sleep", new=AsyncMock()):
         await hook._maybe_retry(event)
     assert event.retry is True
 
@@ -867,12 +902,12 @@ async def test_retry_hook_sets_retry_on_transient_error():
 @pytest.mark.asyncio
 async def test_retry_hook_stops_after_max_retries():
     """_RetryHook does not set retry after _MAX_HOOK_RETRIES attempts."""
-    from amxmodx_genai.core.handler import _MAX_HOOK_RETRIES, _RetryHook
+    from amxx_agent.core.handler import _MAX_HOOK_RETRIES, _RetryHook
 
     hook = _RetryHook()
     event = MagicMock()
     event.exception = RuntimeError("persistent")
-    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+    with patch("amxx_agent.core.handler.asyncio.sleep", new=AsyncMock()):
         for _ in range(_MAX_HOOK_RETRIES):
             await hook._maybe_retry(event)
         event.retry = False
@@ -885,13 +920,13 @@ async def test_retry_hook_does_not_retry_unrecoverable():
     """_RetryHook does not set retry for MaxTokensReachedException."""
     from strands.types.exceptions import MaxTokensReachedException
 
-    from amxmodx_genai.core.handler import _RetryHook
+    from amxx_agent.core.handler import _RetryHook
 
     hook = _RetryHook()
     event = MagicMock()
     event.exception = MaxTokensReachedException("too long")
     event.retry = False
-    with patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()):
+    with patch("amxx_agent.core.handler.asyncio.sleep", new=AsyncMock()):
         await hook._maybe_retry(event)
     assert event.retry is False
 
@@ -899,7 +934,7 @@ async def test_retry_hook_does_not_retry_unrecoverable():
 @pytest.mark.asyncio
 async def test_retry_hook_no_op_when_no_exception():
     """_RetryHook does not touch event.retry when exception is None."""
-    from amxmodx_genai.core.handler import _RetryHook
+    from amxx_agent.core.handler import _RetryHook
 
     hook = _RetryHook()
     event = MagicMock()
@@ -914,7 +949,10 @@ async def _send_single(host: str, port: int, label: str) -> list[dict]:
 
     reader, writer = await asyncio.open_connection(host, port)
     writer.write(
-        (json.dumps({"type": "query", "player": 1, "prompt": label, "tools": []}) + "\n").encode()
+        (
+            json.dumps({"type": "query", "player": 1, "prompt": label, "tools": []})
+            + "\n"
+        ).encode()
     )
     await writer.drain()
     frames: list[dict] = []

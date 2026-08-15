@@ -5,7 +5,7 @@ from pathlib import Path
 
 from strands import AgentSkills
 
-from amxmodx_genai.config import settings
+from amxx_agent.config import settings
 
 log = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ _BUILTIN_SKILLS_DIR = Path(__file__).parent
 def load_plugin_skills(skill_names: list[str]) -> AgentSkills | None:
     """Return an AgentSkills plugin for the requested skill names.
 
-    Each name is resolved against GENAI_SKILLS_PATH. Missing skills are logged
+    Each name is resolved against AGENT_SKILLS_PATH. Missing skills are logged
     and skipped so a bad name never aborts the whole query.
     """
     dirs: list[Path] = []
@@ -39,10 +39,14 @@ def load_plugin_skills(skill_names: list[str]) -> AgentSkills | None:
 def load_builtin_skills() -> AgentSkills | None:
     """Return an AgentSkills plugin for all skills bundled with the sidecar.
 
-    Scans for subdirectories of src/amxmodx_genai/skills/ that contain a SKILL.md.
+    Scans for subdirectories of src/amxx_agent/skills/ that contain a SKILL.md.
     Returns None when no built-in skills exist.
     """
-    dirs = [d for d in _BUILTIN_SKILLS_DIR.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
+    dirs = [
+        d
+        for d in _BUILTIN_SKILLS_DIR.iterdir()
+        if d.is_dir() and (d / "SKILL.md").exists()
+    ]
     if not dirs:
         return None
     return AgentSkills(skills=[str(d) for d in dirs])

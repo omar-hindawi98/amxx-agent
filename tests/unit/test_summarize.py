@@ -6,14 +6,17 @@ import pytest
 
 
 def _get_summarize():
-    from amxmodx_genai.core.summarize import summarize_session
+    from amxx_agent.core.summarize import summarize_session
 
     return summarize_session
 
 
 def _make_history(*turns: tuple[str, str]) -> list[dict]:
     """Build a minimal message history from (role, text) pairs."""
-    return [{"role": role, "content": [{"type": "text", "text": text}]} for role, text in turns]
+    return [
+        {"role": role, "content": [{"type": "text", "text": text}]}
+        for role, text in turns
+    ]
 
 
 def _mock_agent_result(text: str) -> MagicMock:
@@ -45,8 +48,8 @@ async def test_history_with_no_text_blocks_returns_empty_string():
 # ---------------------------------------------------------------------------
 
 
-_AGENT_PATH = "amxmodx_genai.core.summarize.Agent"
-_MODEL_PATH = "amxmodx_genai.core.summarize.get_summary_model"
+_AGENT_PATH = "amxx_agent.core.summarize.Agent"
+_MODEL_PATH = "amxx_agent.core.summarize.get_summary_model"
 
 
 @pytest.mark.asyncio
@@ -63,7 +66,10 @@ async def test_fresh_summary_prompt_contains_conversation():
 
     mock_agent.invoke_async = fake_invoke
 
-    with patch(_AGENT_PATH, return_value=mock_agent), patch(_MODEL_PATH, return_value=MagicMock()):
+    with (
+        patch(_AGENT_PATH, return_value=mock_agent),
+        patch(_MODEL_PATH, return_value=MagicMock()),
+    ):
         result = await _get_summarize()(history, prior_summary="")
 
     assert "user: hello" in captured_prompt[0]
@@ -91,7 +97,10 @@ async def test_merge_prompt_includes_prior_summary():
 
     mock_agent.invoke_async = fake_invoke
 
-    with patch(_AGENT_PATH, return_value=mock_agent), patch(_MODEL_PATH, return_value=MagicMock()):
+    with (
+        patch(_AGENT_PATH, return_value=mock_agent),
+        patch(_MODEL_PATH, return_value=MagicMock()),
+    ):
         result = await _get_summarize()(history, prior_summary="Old stuff")
 
     assert "Prior summary" in captured_prompt[0]
@@ -120,7 +129,10 @@ async def test_result_with_attribute_based_message():
     mock_agent = MagicMock()
     mock_agent.invoke_async = AsyncMock(return_value=mock_result)
 
-    with patch(_AGENT_PATH, return_value=mock_agent), patch(_MODEL_PATH, return_value=MagicMock()):
+    with (
+        patch(_AGENT_PATH, return_value=mock_agent),
+        patch(_MODEL_PATH, return_value=MagicMock()),
+    ):
         result = await _get_summarize()(history, prior_summary="")
 
     assert result == "attr-based result"

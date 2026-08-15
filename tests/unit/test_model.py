@@ -10,89 +10,89 @@ import pytest
 
 
 def test_validate_anthropic_with_key(monkeypatch):
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "anthropic")
-    monkeypatch.setenv("GENAI_MODEL_API_KEY", "sk-test")
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "anthropic")
+    monkeypatch.setenv("AGENT_MODEL_API_KEY", "sk-test")
     import importlib
 
-    import amxmodx_genai.config as cfg
+    import amxx_agent.config as cfg
 
     cfg.settings = cfg.Settings()
-    import amxmodx_genai.core.model as m
+    import amxx_agent.core.model as m
 
     importlib.reload(m)
     m.validate()  # should not raise
 
 
 def test_validate_anthropic_no_key_raises(monkeypatch):
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "anthropic")
-    monkeypatch.delenv("GENAI_MODEL_API_KEY", raising=False)
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "anthropic")
+    monkeypatch.delenv("AGENT_MODEL_API_KEY", raising=False)
     import importlib
 
-    import amxmodx_genai.config as cfg
+    import amxx_agent.config as cfg
 
     cfg.settings = cfg.Settings()
-    import amxmodx_genai.core.model as m
+    import amxx_agent.core.model as m
 
     importlib.reload(m)
-    with pytest.raises(RuntimeError, match="GENAI_MODEL_API_KEY"):
+    with pytest.raises(RuntimeError, match="AGENT_MODEL_API_KEY"):
         m.validate()
 
 
 def test_validate_bedrock_no_key_ok(monkeypatch):
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "bedrock")
-    monkeypatch.delenv("GENAI_MODEL_API_KEY", raising=False)
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "bedrock")
+    monkeypatch.delenv("AGENT_MODEL_API_KEY", raising=False)
     import importlib
 
-    import amxmodx_genai.config as cfg
+    import amxx_agent.config as cfg
 
     cfg.settings = cfg.Settings()
-    import amxmodx_genai.core.model as m
+    import amxx_agent.core.model as m
 
     importlib.reload(m)
     m.validate()  # bedrock does not need an API key
 
 
 def test_validate_ollama_no_key_ok(monkeypatch):
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "ollama")
-    monkeypatch.delenv("GENAI_MODEL_API_KEY", raising=False)
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "ollama")
+    monkeypatch.delenv("AGENT_MODEL_API_KEY", raising=False)
     import importlib
 
-    import amxmodx_genai.config as cfg
+    import amxx_agent.config as cfg
 
     cfg.settings = cfg.Settings()
-    import amxmodx_genai.core.model as m
+    import amxx_agent.core.model as m
 
     importlib.reload(m)
     m.validate()
 
 
 def test_validate_openai_no_key_raises(monkeypatch):
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "openai")
-    monkeypatch.delenv("GENAI_MODEL_API_KEY", raising=False)
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "openai")
+    monkeypatch.delenv("AGENT_MODEL_API_KEY", raising=False)
     import importlib
 
-    import amxmodx_genai.config as cfg
+    import amxx_agent.config as cfg
 
     cfg.settings = cfg.Settings()
-    import amxmodx_genai.core.model as m
+    import amxx_agent.core.model as m
 
     importlib.reload(m)
-    with pytest.raises(RuntimeError, match="GENAI_MODEL_API_KEY"):
+    with pytest.raises(RuntimeError, match="AGENT_MODEL_API_KEY"):
         m.validate()
 
 
 def test_validate_litellm_no_key_raises(monkeypatch):
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", "litellm")
-    monkeypatch.delenv("GENAI_MODEL_API_KEY", raising=False)
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", "litellm")
+    monkeypatch.delenv("AGENT_MODEL_API_KEY", raising=False)
     import importlib
 
-    import amxmodx_genai.config as cfg
+    import amxx_agent.config as cfg
 
     cfg.settings = cfg.Settings()
-    import amxmodx_genai.core.model as m
+    import amxx_agent.core.model as m
 
     importlib.reload(m)
-    with pytest.raises(RuntimeError, match="GENAI_MODEL_API_KEY"):
+    with pytest.raises(RuntimeError, match="AGENT_MODEL_API_KEY"):
         m.validate()
 
 
@@ -101,23 +101,25 @@ def test_validate_litellm_no_key_raises(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _reload_model_module(monkeypatch, backend: str, api_key: str = "", endpoint: str = ""):
-    monkeypatch.setenv("GENAI_MODEL_BACKEND", backend)
+def _reload_model_module(
+    monkeypatch, backend: str, api_key: str = "", endpoint: str = ""
+):
+    monkeypatch.setenv("AGENT_MODEL_BACKEND", backend)
     if api_key:
-        monkeypatch.setenv("GENAI_MODEL_API_KEY", api_key)
+        monkeypatch.setenv("AGENT_MODEL_API_KEY", api_key)
     else:
-        monkeypatch.delenv("GENAI_MODEL_API_KEY", raising=False)
+        monkeypatch.delenv("AGENT_MODEL_API_KEY", raising=False)
     if endpoint:
-        monkeypatch.setenv("GENAI_MODEL_ENDPOINT", endpoint)
+        monkeypatch.setenv("AGENT_MODEL_ENDPOINT", endpoint)
     else:
-        monkeypatch.delenv("GENAI_MODEL_ENDPOINT", raising=False)
+        monkeypatch.delenv("AGENT_MODEL_ENDPOINT", raising=False)
 
     import importlib
 
-    import amxmodx_genai.config as cfg
+    import amxx_agent.config as cfg
 
     cfg.settings = cfg.Settings()
-    import amxmodx_genai.core.model as m
+    import amxx_agent.core.model as m
 
     importlib.reload(m)
     return m
@@ -148,7 +150,9 @@ def test_build_model_anthropic_no_key_empty_client_args(monkeypatch):
 
 def test_build_model_bedrock(monkeypatch):
     mock_cls = MagicMock(return_value=MagicMock())
-    with patch.dict("sys.modules", {"strands.models.bedrock": MagicMock(BedrockModel=mock_cls)}):
+    with patch.dict(
+        "sys.modules", {"strands.models.bedrock": MagicMock(BedrockModel=mock_cls)}
+    ):
         m = _reload_model_module(monkeypatch, "bedrock")
         m._build_model()
     mock_cls.assert_called_once()
@@ -156,7 +160,9 @@ def test_build_model_bedrock(monkeypatch):
 
 def test_build_model_ollama_default_endpoint(monkeypatch):
     mock_cls = MagicMock(return_value=MagicMock())
-    with patch.dict("sys.modules", {"strands.models.ollama": MagicMock(OllamaModel=mock_cls)}):
+    with patch.dict(
+        "sys.modules", {"strands.models.ollama": MagicMock(OllamaModel=mock_cls)}
+    ):
         m = _reload_model_module(monkeypatch, "ollama")
         m._build_model()
     kwargs = mock_cls.call_args.kwargs
@@ -165,7 +171,9 @@ def test_build_model_ollama_default_endpoint(monkeypatch):
 
 def test_build_model_ollama_custom_endpoint(monkeypatch):
     mock_cls = MagicMock(return_value=MagicMock())
-    with patch.dict("sys.modules", {"strands.models.ollama": MagicMock(OllamaModel=mock_cls)}):
+    with patch.dict(
+        "sys.modules", {"strands.models.ollama": MagicMock(OllamaModel=mock_cls)}
+    ):
         m = _reload_model_module(monkeypatch, "ollama", endpoint="http://myhost:11434")
         m._build_model()
     kwargs = mock_cls.call_args.kwargs
@@ -174,8 +182,12 @@ def test_build_model_ollama_custom_endpoint(monkeypatch):
 
 def test_build_model_litellm_with_key_and_endpoint(monkeypatch):
     mock_cls = MagicMock(return_value=MagicMock())
-    with patch.dict("sys.modules", {"strands.models.litellm": MagicMock(LiteLLMModel=mock_cls)}):
-        m = _reload_model_module(monkeypatch, "litellm", api_key="sk-l", endpoint="http://proxy")
+    with patch.dict(
+        "sys.modules", {"strands.models.litellm": MagicMock(LiteLLMModel=mock_cls)}
+    ):
+        m = _reload_model_module(
+            monkeypatch, "litellm", api_key="sk-l", endpoint="http://proxy"
+        )
         m._build_model()
     kwargs = mock_cls.call_args.kwargs
     assert kwargs["client_args"]["api_key"] == "sk-l"
@@ -184,7 +196,9 @@ def test_build_model_litellm_with_key_and_endpoint(monkeypatch):
 
 def test_build_model_openai_with_key(monkeypatch):
     mock_cls = MagicMock(return_value=MagicMock())
-    with patch.dict("sys.modules", {"strands.models.openai": MagicMock(OpenAIModel=mock_cls)}):
+    with patch.dict(
+        "sys.modules", {"strands.models.openai": MagicMock(OpenAIModel=mock_cls)}
+    ):
         m = _reload_model_module(monkeypatch, "openai", api_key="sk-o")
         m._build_model()
     kwargs = mock_cls.call_args.kwargs

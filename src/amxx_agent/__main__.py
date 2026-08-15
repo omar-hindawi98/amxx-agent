@@ -1,5 +1,5 @@
 """Entry point for the GenAI sidecar server."""
 
-from amxmodx_genai.server import serve_cli
+from amxx_agent.server import serve_cli
 
 serve_cli()

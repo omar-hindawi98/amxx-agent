@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from amxmodx_genai.tools.native import current_datetime, get_all
+from amxx_agent.tools.native import current_datetime, get_all
 
 
 def test_current_datetime_is_iso8601():

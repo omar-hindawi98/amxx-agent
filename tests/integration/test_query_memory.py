@@ -16,7 +16,7 @@ from tests.integration.helpers import get_handle, make_agent_result, tcp_exchang
 
 
 def _mem():
-    import amxmodx_genai.core.memory as m
+    import amxx_agent.core.memory as m
 
     return m
 
@@ -37,7 +37,10 @@ async def test_clear_memory(unused_tcp_port):
     async with srv:
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
         writer.write(
-            (json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"}) + "\n").encode()
+            (
+                json.dumps({"type": "clear_memory", "player": 3, "session_id": "3"})
+                + "\n"
+            ).encode()
         )
         await writer.drain()
         await asyncio.wait_for(reader.readline(), timeout=70.0)
@@ -56,7 +59,9 @@ async def test_clear_memory_defaults_to_server_when_no_session_id(unused_tcp_por
     srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
     async with srv:
         reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
-        writer.write((json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode())
+        writer.write(
+            (json.dumps({"type": "clear_memory", "player": 0}) + "\n").encode()
+        )
         await writer.drain()
         await asyncio.wait_for(reader.readline(), timeout=70.0)
         writer.close()
@@ -142,7 +147,7 @@ async def test_longterm_summary_stored_on_clear(unused_tcp_port):
     mem.update("7", "what gun to buy?", "Buy AK47.")
 
     with patch(
-        "amxmodx_genai.core.handler.summarize_session",
+        "amxx_agent.core.handler.summarize_session",
         new=AsyncMock(return_value="- Prefers AK47"),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -150,7 +155,8 @@ async def test_longterm_summary_stored_on_clear(unused_tcp_port):
             reader, writer = await asyncio.open_connection("127.0.0.1", unused_tcp_port)
             writer.write(
                 (
-                    json.dumps({"type": "clear_memory", "player": 7, "session_id": "7"}) + "\n"
+                    json.dumps({"type": "clear_memory", "player": 7, "session_id": "7"})
+                    + "\n"
                 ).encode()
             )
             await writer.drain()
@@ -175,7 +181,7 @@ async def test_longterm_injected_into_system_prompt(unused_tcp_port):
         inst.invoke_async = AsyncMock(return_value=make_agent_result("Buy AK47."))
         return inst
 
-    with patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent):
+    with patch("amxx_agent.core.handler.Agent", side_effect=capture_agent):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:
             await tcp_exchange(

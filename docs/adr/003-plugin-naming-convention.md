@@ -12,10 +12,10 @@ A global registry with collision detection would fail on duplicate names and for
 
 ## Decision
 
-Both `genai_register_tool` and `genai_register_skill` automatically prefix the registered name with the calling plugin's filename (minus `.amxx`) and a double underscore separator.
+Both `agent_register_tool` and `agent_register_skill` automatically prefix the registered name with the calling plugin's filename (minus `.amxx`) and a double underscore separator.
 
-- `genai_register_tool("get_map", ...)` in `my_coach.amxx` -> agent sees `my_coach__get_map`
-- `genai_register_skill("strategy")` in `my_coach.amxx` -> loaded as `my_coach__strategy`
+- `agent_register_tool("get_map", ...)` in `my_coach.amxx` -> agent sees `my_coach__get_map`
+- `agent_register_skill("strategy")` in `my_coach.amxx` -> loaded as `my_coach__strategy`
 
 The SKILL.md `name` field must match the directory name, which uses the same prefixed form.
 

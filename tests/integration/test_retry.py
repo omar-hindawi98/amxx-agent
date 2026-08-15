@@ -21,8 +21,8 @@ async def test_invoke_fails_after_all_retries(unused_tcp_port):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=make_agent),
-        patch("amxmodx_genai.core.handler.asyncio.sleep", new=AsyncMock()),
+        patch("amxx_agent.core.handler.Agent", side_effect=make_agent),
+        patch("amxx_agent.core.handler.asyncio.sleep", new=AsyncMock()),
     ):
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
         async with srv:

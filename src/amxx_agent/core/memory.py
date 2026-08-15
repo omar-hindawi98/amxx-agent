@@ -5,7 +5,7 @@ restarts. Sessions are keyed by arbitrary string IDs chosen by the plugin:
 player index string ("3"), team name ("ct_team"), or any custom key.
 
 Two tiers:
-- Short-term (sessions table): raw message turns, capped at GENAI_MEMORY_MAX_MESSAGES. Cleared on clear().
+- Short-term (sessions table): raw message turns, capped at AGENT_MEMORY_MAX_MESSAGES. Cleared on clear().
 - Long-term (longterm table): LLM-generated summary from past sessions. Survives clear().
 """
 
@@ -14,10 +14,19 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import Float, Integer, String, Text, create_engine, delete, event, select
+from sqlalchemy import (
+    Float,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    delete,
+    event,
+    select,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from amxmodx_genai.config import settings
+from amxx_agent.config import settings
 
 
 class _Base(DeclarativeBase):

@@ -8,7 +8,7 @@ on:
   workflow_call:
 
 env:
-  GENAI_MODEL_NAME: llama3.2:1b
+  AGENT_MODEL_NAME: llama3.2:1b
 
 jobs:
   e2e:
@@ -20,7 +20,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.ollama
-          key: ollama-${{ env.GENAI_MODEL_NAME }}
+          key: ollama-${{ env.AGENT_MODEL_NAME }}
 
       - uses: docker/setup-buildx-action@v4
 
@@ -29,18 +29,18 @@ jobs:
         with:
           context: .
           load: true
-          tags: amxmodx-genai-sidecar:latest
+          tags: amxx-agent-sidecar:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Start services
         run: |
-          GENAI_MODEL_BACKEND=ollama GENAI_MODEL_NAME=${{ env.GENAI_MODEL_NAME }} \
+          AGENT_MODEL_BACKEND=ollama AGENT_MODEL_NAME=${{ env.AGENT_MODEL_NAME }} \
           docker compose up -d ollama sidecar
 
       - name: Pull Ollama model
         run: |
-          docker compose exec ollama ollama pull ${{ env.GENAI_MODEL_NAME }}
+          docker compose exec ollama ollama pull ${{ env.AGENT_MODEL_NAME }}
 
       - name: Wait for sidecar
         run: |
@@ -57,8 +57,8 @@ jobs:
       - name: Run integration tests
         run: uv run pytest tests/integration/ -v
         env:
-          GENAI_SIDECAR_HOST: 127.0.0.1
-          GENAI_SIDECAR_PORT: 27016
+          AGENT_SIDECAR_HOST: 127.0.0.1
+          AGENT_SIDECAR_PORT: 27016
 
       - name: Dump logs on failure
         if: failure()

@@ -26,9 +26,9 @@ async def test_plugin_skills_passed_to_agent(unused_tcp_port, tmp_path):
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.skills.loader.settings") as mock_settings,
-        patch("amxmodx_genai.skills.loader.AgentSkills", return_value=mock_agent_skills),
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.skills.loader.settings") as mock_settings,
+        patch("amxx_agent.skills.loader.AgentSkills", return_value=mock_agent_skills),
     ):
         mock_settings.skills_path = tmp_path
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -61,8 +61,8 @@ async def test_unknown_skill_skipped_query_still_succeeds(unused_tcp_port, tmp_p
         return inst
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.skills.loader.settings") as mock_settings,
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.skills.loader.settings") as mock_settings,
     ):
         mock_settings.skills_path = tmp_path
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -109,8 +109,8 @@ async def test_multiple_skills_both_passed_to_agent_skills(unused_tcp_port, tmp_
         return MagicMock()
 
     with (
-        patch("amxmodx_genai.skills.loader.settings") as mock_settings,
-        patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=fake_agent_skills),
+        patch("amxx_agent.skills.loader.settings") as mock_settings,
+        patch("amxx_agent.skills.loader.AgentSkills", side_effect=fake_agent_skills),
     ):
         mock_settings.skills_path = tmp_path
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -153,8 +153,8 @@ async def test_skill_directory_path_passed_to_agent_skills(unused_tcp_port, tmp_
         return MagicMock()
 
     with (
-        patch("amxmodx_genai.skills.loader.settings") as mock_settings,
-        patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=fake_agent_skills),
+        patch("amxx_agent.skills.loader.settings") as mock_settings,
+        patch("amxx_agent.skills.loader.AgentSkills", side_effect=fake_agent_skills),
     ):
         mock_settings.skills_path = tmp_path
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -196,8 +196,8 @@ async def test_partial_skill_list_passes_only_found_skills(unused_tcp_port, tmp_
         return MagicMock()
 
     with (
-        patch("amxmodx_genai.skills.loader.settings") as mock_settings,
-        patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=fake_agent_skills),
+        patch("amxx_agent.skills.loader.settings") as mock_settings,
+        patch("amxx_agent.skills.loader.AgentSkills", side_effect=fake_agent_skills),
     ):
         mock_settings.skills_path = tmp_path
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)
@@ -222,7 +222,9 @@ async def test_partial_skill_list_passes_only_found_skills(unused_tcp_port, tmp_
 
 
 @pytest.mark.asyncio
-async def test_agent_skills_constructor_raises_query_still_succeeds(unused_tcp_port, tmp_path):
+async def test_agent_skills_constructor_raises_query_still_succeeds(
+    unused_tcp_port, tmp_path
+):
     """When AgentSkills() raises during construction, the query completes without plugins."""
     skill_dir = tmp_path / "badskill"
     skill_dir.mkdir()
@@ -240,9 +242,9 @@ async def test_agent_skills_constructor_raises_query_still_succeeds(unused_tcp_p
         raise RuntimeError("corrupted skill file")
 
     with (
-        patch("amxmodx_genai.core.handler.Agent", side_effect=capture_agent),
-        patch("amxmodx_genai.skills.loader.settings") as mock_settings,
-        patch("amxmodx_genai.skills.loader.AgentSkills", side_effect=raising_skills),
+        patch("amxx_agent.core.handler.Agent", side_effect=capture_agent),
+        patch("amxx_agent.skills.loader.settings") as mock_settings,
+        patch("amxx_agent.skills.loader.AgentSkills", side_effect=raising_skills),
     ):
         mock_settings.skills_path = tmp_path
         srv = await asyncio.start_server(get_handle(), "127.0.0.1", unused_tcp_port)

@@ -8,8 +8,8 @@ services:
       - MAXPLAYERS=4
       - SV_LAN=1
       - CPU_MHZ=3000
-      - GENAI_HOST=sidecar
-      - GENAI_PORT=27016
+      - AGENT_HOST=sidecar
+      - AGENT_PORT=27016
     ports:
       - "27015:27015/udp"
       - "27015:27015/tcp"
@@ -24,14 +24,14 @@ services:
 
   sidecar:
     build: .
-    image: amxmodx-genai-sidecar:latest
+    image: amxx-agent-sidecar:latest
     environment:
-      - GENAI_HOST=0.0.0.0
-      - GENAI_PORT=27016
-      - GENAI_MODEL_BACKEND=${GENAI_MODEL_BACKEND:-anthropic}
-      - GENAI_MODEL_NAME=${GENAI_MODEL_NAME:-}
-      - GENAI_MODEL_ENDPOINT=http://ollama:11434
-      - GENAI_MODEL_API_KEY=${GENAI_MODEL_API_KEY:-}
+      - AGENT_HOST=0.0.0.0
+      - AGENT_PORT=27016
+      - AGENT_MODEL_BACKEND=${AGENT_MODEL_BACKEND:-anthropic}
+      - AGENT_MODEL_NAME=${AGENT_MODEL_NAME:-}
+      - AGENT_MODEL_ENDPOINT=http://ollama:11434
+      - AGENT_MODEL_API_KEY=${AGENT_MODEL_API_KEY:-}
     ports:
       - "27016:27016"
     depends_on:

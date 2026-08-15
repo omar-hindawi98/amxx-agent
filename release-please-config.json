@@ -10,7 +10,7 @@
         },
         {
           "type": "generic",
-          "path": "plugins/amxmodx_genai/core.sma"
+          "path": "plugins/amxx_agent/core.sma"
         }
       ]
     }
