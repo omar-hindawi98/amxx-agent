@@ -1,4 +1,12 @@
-#if defined _amxagent_core_skills_included #endinput #endif #define
-_amxagent_core_skills_included stock register_core_skills() { if (g_iSkillCount
-< MAX_SKILLS) { copy(g_szSkillName[g_iSkillCount], MAX_SKILL_NAME - 1,
-"amxmodx-reference"); g_iSkillCount++; } }
+#if defined _amxagent_core_skills_included
+    #endinput
+#endif
+#define _amxagent_core_skills_included
+
+stock register_core_skills()
+{
+    if (g_iSkillCount < MAX_SKILLS) {
+        copy(g_szSkillName[g_iSkillCount], MAX_SKILL_NAME - 1, "amxmodx-reference");
+        g_iSkillCount++;
+    }
+}

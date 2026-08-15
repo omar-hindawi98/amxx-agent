@@ -346,8 +346,8 @@ public native_query_player(plugin_id, num_params)
     get_string(2, prompt, MAX_PROMPT - 1);
     new callback[MAX_CALLBACK];
     get_string(3, callback, MAX_CALLBACK - 1);
-    new this_plugin = (num_params >= 4) ? (get_param(4) != 0) : 0;
-    new no_memory   = (num_params >= 5) ? (get_param(5) != 0) : 0;
+    new bool:this_plugin = (num_params >= 4) ? (bool:(get_param(4))) : false;
+    new bool:no_memory   = (num_params >= 5) ? (bool:(get_param(5))) : false;
 
     new steamid[MAX_SESSION_ID];
     get_steamid_or_server(player, steamid, MAX_SESSION_ID - 1);
@@ -381,8 +381,8 @@ public native_query(plugin_id, num_params)
     get_string(3, session_id, MAX_SESSION_ID - 1);
     if (!session_id[0])
         copy(session_id, MAX_SESSION_ID - 1, "server");
-    new this_plugin = (num_params >= 4) ? (get_param(4) != 0) : 0;
-    new no_memory   = (num_params >= 5) ? (get_param(5) != 0) : 0;
+    new bool:this_plugin = (num_params >= 4) ? (bool:(get_param(4))) : false;
+    new bool:no_memory   = (num_params >= 5) ? (bool:(get_param(5))) : false;
 
     if (this_plugin) {
         new plugin_filename[MAX_PLUGIN_NAME];
