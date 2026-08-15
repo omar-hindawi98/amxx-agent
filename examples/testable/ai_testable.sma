@@ -25,7 +25,6 @@
 
 #include <amxmodx>
 #include <amxx_agent>
-#include <json>
 
 #define PLUGIN    "AI Testable Example"
 #define VERSION   "1.0.0"
